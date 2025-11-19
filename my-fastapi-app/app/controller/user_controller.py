@@ -12,10 +12,5 @@ class UserController:
                 detail="Email này đã được đăng ký."
             )
 
-        # Check trùng Username
-        if UserService.get_user_by_username(db, username=user_data.username):
-            raise HTTPException(
-                status_code=400, 
-                detail="Username này đã được sử dụng."
-            )
+      
         return UserService.create_new_user(db=db,user_data=user_data)

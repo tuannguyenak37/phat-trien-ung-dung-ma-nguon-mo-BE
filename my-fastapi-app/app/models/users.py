@@ -20,13 +20,13 @@ class Users(Base):
         index= True,
         default= lambda: createID("user")
     )
-   # 3. Các trường cơ bản
-    username = Column(String(50), unique=True, index=True, nullable=False)
+
     email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
+    fistName = Column(String(50),nullable=False)
+    lastName = Column(String(100),nullable=False)
 
-    # 4. role: user_role (Enum)
-    # SQLAlchemy sẽ tự động chuyển đổi giữa Enum Python và Enum SQL
+    
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
 
     # 5. reputation_score: INTEGER DEFAULT 0

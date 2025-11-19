@@ -15,16 +15,20 @@ class UserRole(str, Enum):
 
 # --- Pydantic model input ---
 class UserCreate(BaseModel):
-    username: str
+  
     email: EmailStr           # dùng EmailStr validate email
     password: str
+    fistName :str
+    lastName:str
     role: UserRole = UserRole.USER   # mặc định là user
 
 class UserResponse(BaseModel):
     user_id: str       # <--- Đã đổi từ 'id' sang 'user_id'
-    username: str
+   
     email: EmailStr
     role: UserRole
+    fistName :str
+    lastName:str
     reputation_score: int
     created_at: datetime # Pydantic tự convert thời gian về dạng chuỗi ISO 8601
 

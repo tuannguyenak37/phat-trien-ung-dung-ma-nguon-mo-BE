@@ -6,11 +6,10 @@ from app.db.connection import get_db
 from app.schemas.user import UserCreate, UserResponse
 from app.controller.user_controller import UserController
 
-# --- SỬA Ở ĐÂY: Đặt tên biến là router ---
+
 user_router  = APIRouter() 
 # ---------------------------------------
 
-# Sửa decorator bên dưới dùng biến 'router' vừa đổi
 @user_router.post("/create", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     return UserController.create_user(db=db, user_data=user_data)
