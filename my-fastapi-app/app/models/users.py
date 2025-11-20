@@ -23,7 +23,7 @@ class Users(Base):
 
     email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
-    fistName = Column(String(50),nullable=False)
+    firstName = Column(String(50),nullable=False)
     lastName = Column(String(100),nullable=False)
 
     

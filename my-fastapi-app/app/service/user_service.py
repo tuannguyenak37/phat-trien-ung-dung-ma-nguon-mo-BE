@@ -1,7 +1,10 @@
 from sqlalchemy.orm import Session
 from ..models.users import Users
-from ..schemas.user import UserCreate
+from ..schemas.user import UserCreate,Login
+from fastapi import  HTTPException,status
 import bcrypt
+from app.middweare.JWT.token import access_Token, refresh_token
+
 # --- Hash mật khẩu ---
 def hash_password(password: str) -> str:
     password_bytes = password.encode('utf-8')          # chuyển string -> bytes
@@ -20,7 +23,7 @@ class UserService:
         db_user = Users(
               # từ request
         email = user_data.email,
-        fistName= user_data.fistName,
+        firstName= user_data.firstName,
         lastName = user_data.lastName,
         password = passwordHased             # từ hash_password()
         )
@@ -30,7 +33,32 @@ class UserService:
         db.refresh(db_user)
 
         return db_user
-
     
+    @staticmethod
+    def login(db:Session,user:Login):
+        data = db.query(Users).filter(Users.email== user.email).first()
+        if  not data:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=" email hoặc  mật khẩu sai")
+        if not bcrypt.checkpw( user.password.encode('utf-8'),data.password.encode('utf-8')):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sai mật khẩu")
+        
+        payload = {
+    "user_id": data.user_id,
+    "firstName": data.firstName,
+    "lastName": data.lastName,
+    "role": data.role
+        }
+
+        access_TokenNew = access_Token(payload)
+        refresh_tokenNew = refresh_token(payload)
+        return{"access_token":access_TokenNew,"refresh_token":refresh_tokenNew, "user_id": data.user_id,
+    "firstName": data.firstName,
+    "lastName": data.lastName,
+    "role": data.role}
+
+        
+        
+       
+
 
         

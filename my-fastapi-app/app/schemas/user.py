@@ -18,7 +18,7 @@ class UserCreate(BaseModel):
   
     email: EmailStr           # dùng EmailStr validate email
     password: str
-    fistName :str
+    firstName :str
     lastName:str
     role: UserRole = UserRole.USER   # mặc định là user
 
@@ -27,10 +27,22 @@ class UserResponse(BaseModel):
    
     email: EmailStr
     role: UserRole
-    fistName :str
+    firstName :str
     lastName:str
     reputation_score: int
     created_at: datetime # Pydantic tự convert thời gian về dạng chuỗi ISO 8601
 
+
+class Login(BaseModel):
+    email: EmailStr
+    password:str
+
+class resposLogin(BaseModel):
+     user_id:str
+     role:str
+     firstName:str
+     lastName:str
+     access_token:str
+     refresh_token:str
 class Config:
         from_attributes = True

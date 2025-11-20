@@ -14,7 +14,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,  # Cho phép các domain này
-    allow_credentials=True,
+    allow_credentials=True, #cho phép cooki
     allow_methods=["*"],  # Cho phép GET, POST, PUT, DELETE,...
     allow_headers=["*"],  # Cho phép tất cả headers
 )
