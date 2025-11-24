@@ -44,9 +44,5 @@ class resposLogin(BaseModel):
      lastName:str
      access_token:str
      refresh_token:str
-
-
-
-     
 class Config:
         from_attributes = True

@@ -6,9 +6,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
-from app.db.connection import Base # Import Base để lấy metadata
-# 2. SỬA IMPORT: Xóa dấu '..' đi, chỉ dùng 'app'
-from app.models.users import Users
+from app.models import Base# 2. SỬA IMPORT: Xóa dấu '..' đi, chỉ dùng 'app'
 
 from alembic import context
 # --------------------------

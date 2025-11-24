@@ -1,37 +1,46 @@
 from sqlalchemy import Column, String, Integer, Enum, DateTime
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 import enum
-from sqlalchemy.sql import func  
+from typing import TYPE_CHECKING, List # Import này để fix lỗi "Not defined"
+
 from ..db.connection import Base
 from ..utils.createID import createID
-# Enum trong Python phải khớp với enum trong PostgreSQL
+
+# Chỉ import các file khác KHI đang kiểm tra type (không chạy lúc runtime)
+# Đây là cách fix lỗi "Thread is not defined" chuẩn nhất
+if TYPE_CHECKING:
+    from .thread import Thread
+    from .comment import Comment
+    from .vote import Vote
+
 class UserRole(str, enum.Enum):
-    # Tên biến (bên trái) phải VIẾT HOA để khớp với UserRole.USER
     USER = "user"       
     ADMIN = "admin"
     MODERATOR = "moderator"
-# ------------------------
 
 class Users(Base):
     __tablename__ ="users"
 
-    user_id  = Column(
+    user_id = Column(
         String(50),
-        primary_key= True,
-        index= True,
-        default= lambda: createID("user")
+        primary_key=True,
+        index=True,
+        # Truyền "user" vào createID như bạn yêu cầu
+        default=lambda: createID("user") 
     )
 
     email = Column(String(100), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
-    firstName = Column(String(50),nullable=False)
-    lastName = Column(String(100),nullable=False)
-
+    firstName = Column(String(50), nullable=False)
+    lastName = Column(String(100), nullable=False)
     
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
-
-    # 5. reputation_score: INTEGER DEFAULT 0
     reputation_score = Column(Integer, default=0, nullable=False)
-
-    # 6. created_at: TIMESTAMPTZ DEFAULT NOW()
-    # server_default=func.now() nghĩa là để Database tự điền giờ server vào
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # --- RELATIONSHIPS ---
+    # Dùng chuỗi string "Thread", "Comment" thay vì biến class trực tiếp
+    threads = relationship("Thread", back_populates="user")
+    comments = relationship("Comment", back_populates="user")
+    votes = relationship("Vote", back_populates="user")
