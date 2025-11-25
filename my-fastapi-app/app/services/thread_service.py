@@ -5,6 +5,8 @@ from app.models.thread import Thread, ThreadMedia
 from app.models.tags import Tags  # <--- Sửa tên import thành Tags (số nhiều)
 from app.schemas.thread import ThreadCreateForm,ThreadUpdateForm
 from app.middweare.upload.upload_file import upload_service
+from sqlalchemy import desc
+from typing import List,Optional
 
 class ThreadService:
 
@@ -136,3 +138,40 @@ class ThreadService:
         db.delete(thread)
         db.commit()
         return {"message": "Thread deleted successfully"}
+    
+    # 4. LẤY DANH SÁCH (Phân trang + Lọc)
+    @staticmethod
+    async def get_threads(
+        db: Session, 
+        skip: int = 0, 
+        limit: int = 10, 
+        category_id: Optional[str] = None,
+        tag_name: Optional[str] = None
+    ):
+        # Bắt đầu query
+        query = db.query(Thread).options(
+            joinedload(Thread.tags),
+            joinedload(Thread.media)
+        )
+
+        # Lọc theo Category
+        if category_id:
+            query = query.filter(Thread.category_id == category_id)
+        
+        # Lọc theo Tag (Phức tạp hơn xíu vì phải join bảng tags)
+        if tag_name:
+            query = query.join(Thread.tags).filter(Tags.name == tag_name)
+
+        # Sắp xếp: Mới nhất lên đầu
+        query = query.order_by(desc(Thread.created_at))
+
+        # Phân trang
+        total = query.count() # Đếm tổng số bài (để FE làm phân trang)
+        threads = query.offset(skip).limit(limit).all()
+
+        return {
+            "total": total,
+            "page": (skip // limit) + 1,
+            "size": limit,
+            "data": threads
+        }

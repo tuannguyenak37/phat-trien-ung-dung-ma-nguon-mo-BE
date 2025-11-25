@@ -39,4 +39,14 @@ class ThreadController:
             user_id=user_id, 
             role=role
         )
-    
+    async def get_list_threads(
+        self, db: Session, page: int, limit: int, category_id: str, tag: str
+    ):
+        skip = (page - 1) * limit
+        return await self.service.get_threads(
+            db=db, 
+            skip=skip, 
+            limit=limit, 
+            category_id=category_id, 
+            tag_name=tag
+        )
