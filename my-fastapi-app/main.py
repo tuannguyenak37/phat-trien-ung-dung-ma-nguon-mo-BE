@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.router.user_router import user_router
 from app.middweare.JWT.refresh_token import router_token
-
+from app.router.category_router import router
+from app.router.thread_router import router_thead
 app = FastAPI()
 
 # Cấu hình CORS
@@ -28,7 +29,8 @@ def read_root():
 # Include router
 app.include_router(user_router, prefix="/api/users", tags=["user"])
 app.include_router(router_token,prefix="/api/token",tags=["token"])
-
+app.include_router(router_thead, prefix="/api", tags=["threads"])
+app.include_router(router, prefix="/api/catcategory", tags=["category"])
 # Route có tham số
 @app.get("/items/{item_id}")
 def read_item(item_id: int, q: str | None = None):

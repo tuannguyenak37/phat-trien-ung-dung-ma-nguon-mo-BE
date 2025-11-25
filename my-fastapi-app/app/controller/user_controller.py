@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException,status,Response
 from ..schemas.user import UserCreate,Login
-from ..service.user_service  import UserService
+from ..services.user_service  import UserService
 class UserController:
     @staticmethod
     def create_user(db: Session,user_data: UserCreate):

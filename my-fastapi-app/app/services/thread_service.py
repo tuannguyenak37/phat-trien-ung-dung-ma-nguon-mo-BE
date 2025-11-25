@@ -1,0 +1,138 @@
+from sqlalchemy.orm import Session,joinedload
+# Import đúng tên Class từ Model của bạn
+from fastapi import HTTPException, status
+from app.models.thread import Thread, ThreadMedia
+from app.models.tags import Tags  # <--- Sửa tên import thành Tags (số nhiều)
+from app.schemas.thread import ThreadCreateForm,ThreadUpdateForm
+from app.middweare.upload.upload_file import upload_service
+
+class ThreadService:
+
+    @staticmethod
+    async def create_thread(db: Session, user_id: str, form_data: ThreadCreateForm):
+        # 1. Tạo Thread
+        new_thread = Thread(
+            user_id=user_id, 
+            category_id=form_data.category_id,  # <--- QUAN TRỌNG: Thêm dòng này
+            title=form_data.title, 
+            content=form_data.content,
+            is_locked=False,
+            is_pinned=False
+            # created_at, updated_at tự động sinh bởi server_default
+        )
+        db.add(new_thread)
+        db.flush() # Flush để SQLAlchemy chuẩn bị transaction, ID sẽ được tạo ở đây
+
+        # 2. Xử lý Tags (Many-to-Many)
+        if form_data.tags:
+            unique_tags = set(tag.strip() for tag in form_data.tags if tag.strip())
+            for tag_name in unique_tags:
+                # Tìm tag trong DB (Sửa Tag -> Tags)
+                tag_in_db = db.query(Tags).filter(Tags.name == tag_name).first()
+                
+                if not tag_in_db:
+                    # Nếu chưa có thì tạo mới (ID tự sinh bởi createID trong Model)
+                    tag_in_db = Tags(name=tag_name)
+                    db.add(tag_in_db)
+                    db.flush() 
+                
+                # SQLAlchemy tự xử lý bảng trung gian 'thread_tags'
+                new_thread.tags.append(tag_in_db)
+
+        # 3. Xử lý Media (One-to-Many)
+        if form_data.files: 
+            valid_files = [file for file in form_data.files if file.filename]
+            
+            if valid_files:
+                # Upload file (Async)
+                file_paths = await upload_service.save_multiple_files(valid_files)
+                
+                for idx, path in enumerate(file_paths):
+                    fname = valid_files[idx].filename.lower()
+                    m_type = "video" if fname.endswith(('.mp4', '.mov', '.avi')) else "image"
+                    
+                    new_media = ThreadMedia(
+                        # Dùng relationship object thay vì ID thủ công để an toàn hơn
+                        thread=new_thread,      # <--- SQLAlchemy tự map vào thread_id
+                        media_type=m_type,
+                        file_url=path,
+                        sort_order=idx
+                        # media_id tự sinh bởi createID
+                    )
+                    db.add(new_media)
+
+        # 4. Commit transaction
+        db.commit()
+        
+        # 5. Refresh để load lại các relationship (tags, media) vừa thêm để trả về response
+        db.refresh(new_thread) 
+        
+        return new_thread
+    @staticmethod
+    async def get_thread_by_id(db: Session, thread_id: str):
+        # Dùng options(joinedload(...)) để lấy luôn tags và media
+        thread = db.query(Thread).options(
+            joinedload(Thread.tags),  # Join bảng tags
+            joinedload(Thread.media)  # Join bảng media
+        ).filter(Thread.thread_id == thread_id).first()
+        
+        if not thread:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        
+        return thread
+
+    # 2. CẬP NHẬT (SỬA)
+    @staticmethod
+    async def update_thread(db: Session, thread_id: str, user_id: str, form_data: ThreadUpdateForm):
+        # Tìm bài viết
+        thread = db.query(Thread).filter(Thread.thread_id == thread_id).first()
+        if not thread:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        
+        # Check quyền (Chỉ chủ bài viết mới được sửa)
+        if thread.user_id != user_id:
+            raise HTTPException(status_code=403, detail="You are not allowed to edit this thread")
+
+        # Cập nhật thông tin text (nếu có gửi lên)
+        if form_data.title:
+            thread.title = form_data.title
+        if form_data.content:
+            thread.content = form_data.content
+        if form_data.category_id:
+            thread.category_id = form_data.category_id
+
+        # Cập nhật Tags (Logic: Xóa hết tags cũ nối lại tags mới - hoặc merge tùy logic)
+        # Ở đây mình làm cách: Thay thế toàn bộ tags cũ bằng tags mới
+        if form_data.tags is not None: # Check is not None vì tags=[] nghĩa là xóa hết tags
+            thread.tags.clear() # Xóa liên kết cũ
+            unique_tags = set(tag.strip() for tag in form_data.tags if tag.strip())
+            for tag_name in unique_tags:
+                tag_in_db = db.query(Tags).filter(Tags.name == tag_name).first()
+                if not tag_in_db:
+                    tag_in_db = Tags(name=tag_name)
+                    db.add(tag_in_db)
+                    db.flush()
+                thread.tags.append(tag_in_db)
+
+        db.commit()
+        db.refresh(thread)
+        return thread
+
+    # 3. XÓA BÀI VIẾT
+    @staticmethod
+    async def delete_thread(db: Session, thread_id: str, user_id: str, role: str):
+        thread = db.query(Thread).filter(Thread.thread_id == thread_id).first()
+        if not thread:
+            raise HTTPException(status_code=404, detail="Thread not found")
+
+        # Check quyền: Chủ bài viết HOẶC Admin mới được xóa
+        if thread.user_id != user_id and role != "admin":
+             raise HTTPException(status_code=403, detail="You are not allowed to delete this thread")
+
+        # Xóa file vật lý (Optional - Nâng cao: nên xóa file trong thư mục static luôn để đỡ rác)
+        # ... logic xóa file ...
+
+        # Xóa trong DB
+        db.delete(thread)
+        db.commit()
+        return {"message": "Thread deleted successfully"}
