@@ -125,7 +125,7 @@ class ThreadService:
     async def delete_thread(db: Session, thread_id: str, user_id: str, role: str):
         thread = db.query(Thread).filter(Thread.thread_id == thread_id).first()
         if not thread:
-            raise HTTPException(status_code=404, detail="Thread not found")
+            raise HTTPException(status_code=404, detail="Thread not found.....")
 
         # Check quyền: Chủ bài viết HOẶC Admin mới được xóa
         if thread.user_id != user_id and role != "admin":
@@ -175,3 +175,17 @@ class ThreadService:
             "size": limit,
             "data": threads
         }
+    @staticmethod
+    def get_user_threads_by_page(db: Session, user_id: str, skip: int = 0, limit: int = 10):
+        
+        query = (
+            db.query(Thread)
+            .filter(Thread.user_id == user_id)  # <--- QUAN TRỌNG: Chỉ lấy bài của user này
+            .order_by(Thread.created_at.desc()) # Sắp xếp mới nhất lên đầu
+            .offset(skip)                       # Bỏ qua số lượng đã tải
+            .limit(limit)                       # Lấy số lượng tiếp theo
+            .all()
+        )
+
+        return query
+

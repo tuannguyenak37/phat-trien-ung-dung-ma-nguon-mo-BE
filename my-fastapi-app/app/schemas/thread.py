@@ -95,5 +95,4 @@ class ThreadListResponse(BaseModel):
     total: int
     page: int
     size: int
-    # QUAN TRỌNG: Dòng này bảo Pydantic hãy dùng ThreadResponse để dịch từng item trong list
     data: List[ThreadResponse]

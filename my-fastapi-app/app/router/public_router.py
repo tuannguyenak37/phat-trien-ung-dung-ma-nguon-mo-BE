@@ -5,6 +5,11 @@ from app.schemas.thread import  ThreadResponse
 from typing import Optional
 from app.schemas.thread import ThreadListResponse
 from app.controller.thread_controller import ThreadController
+from app.schemas.user import UserpublicResponse
+from app.controller.user_controller import UserController
+from app.schemas.category import CategoryThead
+from app.services.category_service import CategoryService
+from typing import List
 router_public = APIRouter(
     prefix="/public",
     tags=["Public"],
@@ -29,3 +34,29 @@ async def get_list_threads(
     return await ThreadController().get_list_threads(
         db=db, page=page, limit=limit, category_id=category_id, tag=tag
     )
+@router_public.get("/users/{user_id}", response_model=UserpublicResponse)
+def get_user_public_profile(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    return UserController.get_profile_public(db=db, user_id=user_id)
+
+@router_public.get("/users/profile/{user_id}", response_model=ThreadListResponse) # <--- Dùng nó ở đây
+def get_user_threads_public(
+    user_id: str,
+    page: int = 1,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    # Gọi Controller
+    return ThreadController().get_thread_by_id(db=db, user_id=user_id, page=page, limit=limit)
+@router_public.get("/categories/get", response_model=CategoryThead)
+def get_categories_with_threads(
+    db: Session = Depends(get_db)
+):
+    # Bước 1: Lấy list category từ Service (đây là list các SQLAlchemy Object)
+    categories_list = CategoryService.get_category_thead(db=db)
+    
+    # Bước 2: Trả về đúng cấu trúc của response_model (CategoryThead)
+    # CategoryThead yêu cầu một trường tên là 'list_thread'
+    return {"list_thread": categories_list}

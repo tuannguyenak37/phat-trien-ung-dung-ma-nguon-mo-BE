@@ -67,3 +67,16 @@ class CategoryService:
     @staticmethod
     def get_all(db: Session):
         return db.query(Categories).all()
+    
+    @staticmethod
+    def get_category_thead(db: Session):
+        categories = db.query(Categories).all()
+        # Lưu ý: Nếu muốn trả về rỗng thay vì lỗi 404 khi không có category nào
+        # thì bỏ đoạn check len == 0 đi. Thường list rỗng vẫn là valid response (200 OK).
+        if not categories: 
+             # Tùy logic: Có thể raise lỗi hoặc return []
+             # Nếu raise 404 ở đây thì client sẽ nhận lỗi thay vì list rỗng
+             # raise HTTPException(status_code=404, detail="Category not found")
+             return [] 
+             
+        return categories

@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional
-
+from typing import List, Optional
 
 class CategoryCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    # Lưu ý: Không cần gửi slug, Backend sẽ tự tạo
+   
 
 # Khuôn cho dữ liệu trả về Client
 class CategoryResponse(BaseModel):
@@ -13,6 +13,8 @@ class CategoryResponse(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
+    class Config:
+        from_attributes = True
 
    
 
@@ -25,5 +27,10 @@ class categoryDelete(BaseModel):
     category_id: str
 
 
+    class Config:
+        from_attributes = True
+
+class CategoryThead (BaseModel):
+    list_thread: List[CategoryResponse]
     class Config:
         from_attributes = True

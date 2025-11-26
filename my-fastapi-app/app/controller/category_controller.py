@@ -19,6 +19,7 @@ class CategoryController:
         return self.service.delete_category(db =db, category_id = category_id)
     def edit(self, db: Session, category_id: str, category_in: CategoryCreate):
         return self.service.edit_category(db = db, category_id = category_id, category_in = category_in)
+    
 
 
 category_controller = CategoryController()

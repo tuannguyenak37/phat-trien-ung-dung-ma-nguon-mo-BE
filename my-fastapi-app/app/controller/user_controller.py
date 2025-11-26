@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException,status,Response
 from ..schemas.user import UserCreate,Login
 from ..services.user_service  import UserService
+from app.models.users import Users
 class UserController:
     @staticmethod
     def create_user(db: Session,user_data: UserCreate):
@@ -37,5 +38,15 @@ class UserController:
         )
 
         return res
+    @staticmethod
+    def get_profile_public(db: Session,user_id:str):
+        user = db.query(Users).filter(Users.user_id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        user.password_hash = None  # Ẩn thông tin mật khẩu
+        return user
 
     

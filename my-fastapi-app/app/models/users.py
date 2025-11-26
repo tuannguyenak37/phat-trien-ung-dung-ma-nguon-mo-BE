@@ -38,6 +38,9 @@ class Users(Base):
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
     reputation_score = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    url_avatar = Column(String(255), nullable=True)
+    description = Column(String(500), nullable=True)
+
 
     # --- RELATIONSHIPS ---
     # Dùng chuỗi string "Thread", "Comment" thay vì biến class trực tiếp

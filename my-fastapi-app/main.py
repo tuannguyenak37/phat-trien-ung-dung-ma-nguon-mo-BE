@@ -6,6 +6,7 @@ from app.router.category_router import router
 from app.router.thread_router import router_thead
 from app.router.public_router import router_public
 app = FastAPI()
+from fastapi.staticfiles import StaticFiles
 
 # Cấu hình CORS
 origins = [
@@ -33,6 +34,8 @@ app.include_router(router_token,prefix="/api/token",tags=["token"])
 app.include_router(router_public, prefix="/api", tags=["public"])
 app.include_router(router_thead, prefix="/api", tags=["threads"])
 app.include_router(router, prefix="/api/catcategory", tags=["category"])
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Route có tham số
 @app.get("/items/{item_id}")
 def read_item(item_id: int, q: str | None = None):

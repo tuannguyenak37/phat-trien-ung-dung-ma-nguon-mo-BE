@@ -46,3 +46,24 @@ class resposLogin(BaseModel):
      refresh_token:str
 class Config:
         from_attributes = True
+
+class UserpublicResponse(BaseModel):
+    user_id: str       
+    email: EmailStr
+    role: UserRole
+
+   
+    firstName :str
+    lastName:str
+    url_avatar: str | None = None
+    description: str | None = None
+    reputation_score: int
+    
+
+    class Config:
+        from_attributes = True
+class  Userpublic(BaseModel):
+    user_id: str       
+
+    class Config:
+        from_attributes = True
