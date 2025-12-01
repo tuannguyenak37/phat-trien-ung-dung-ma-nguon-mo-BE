@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import TSVECTOR
@@ -18,7 +18,7 @@ class Comment(Base):
     comment_id = Column(
         String(50), 
         primary_key=True, 
-        default=lambda: createID("comment") # Truyền "comment"
+        default=lambda: createID("comment")
     )
     
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"))
@@ -27,6 +27,14 @@ class Comment(Base):
     
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # 👇 Thêm updated_at
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # 👇 3 CỘT MỚI THÊM VÀO ĐÂY
+    reply_count = Column(Integer, default=0, nullable=False)
+    upvote_count = Column(Integer, default=0, nullable=False)
+    downvote_count = Column(Integer, default=0, nullable=False)
+
     search_vector = Column(TSVECTOR)
 
     # Relationships

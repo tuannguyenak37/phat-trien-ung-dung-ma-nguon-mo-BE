@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, List
 
 from ..db.connection import Base
 from ..utils.createID import createID
-from .tags import thread_tags # Import bảng trung gian từ file tags.py
+from .tags import thread_tags 
 
 if TYPE_CHECKING:
     from .users import Users
@@ -21,10 +21,9 @@ class Thread(Base):
     thread_id = Column(
         String(50), 
         primary_key=True, 
-        default=lambda: createID("thread") # Truyền "thread"
+        default=lambda: createID("thread")
     )
     
-    # FK trỏ về bảng users (tên class trong users.py là Users nhưng bảng là users)
     user_id = Column(String(50), ForeignKey("users.user_id", ondelete="SET NULL"))
     category_id = Column(String(50), ForeignKey("categories.category_id", ondelete="RESTRICT"))
     
@@ -35,10 +34,15 @@ class Thread(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
+    # 👇 3 CỘT MỚI THÊM VÀO ĐÂY
+    comment_count = Column(Integer, default=0, nullable=False)
+    upvote_count = Column(Integer, default=0, nullable=False)
+    downvote_count = Column(Integer, default=0, nullable=False)
+    
     search_vector = Column(TSVECTOR)
 
     # Relationships
-    user = relationship("Users", back_populates="threads") # "Users" khớp tên Class trong users.py
+    user = relationship("Users", back_populates="threads")
     category = relationship("Categories", back_populates="threads")
     
     tags = relationship("Tags", secondary=thread_tags, back_populates="threads", lazy="selectin")

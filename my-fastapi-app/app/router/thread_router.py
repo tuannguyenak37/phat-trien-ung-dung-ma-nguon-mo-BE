@@ -1,61 +1,84 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from app.db.connection import get_db
-from app.schemas.thread import ThreadCreateForm, ThreadResponse,ThreadUpdateForm
-from app.middweare.JWT.auth import get_current_user
-from app.controller.thread_controller import ThreadController
+from typing import List, Optional
+
+from ..db.connection import get_db
+from ..controller.thread_controller import ThreadController
+from ..schemas.thread import ThreadCreateForm, ThreadResponse, ThreadUpdateForm, ThreadListResponse
+
+# Import Dependency Auth
+from app.middleware.JWT.auth import get_current_user, get_current_user_or_guest
 
 router_thead = APIRouter(
     prefix="/threads",
-    tags=["Threads"],
-    dependencies=[Depends(get_current_user)]
+    tags=["Threads"]
 )
 
-@router_thead.post("/create", response_model=ThreadResponse)
-# --- SỬA Ở ĐÂY: Thêm async ---
-async def create_thread(
-    data: ThreadCreateForm = Depends(ThreadCreateForm.as_form),
+# --- GET LIST (FEED) ---
+@router_thead.get("/", response_model=ThreadListResponse) # <-- Dùng Schema mới
+async def get_list_threads(
+    page: int = 1,
+    limit: int = 10,
+    category_id: Optional[str] = None,
+    tag: Optional[str] = None,
     db: Session = Depends(get_db),
-    payload: dict = Depends(get_current_user) 
+    # 👇 Lấy user hiện tại hoặc Guest (để check like)
+    current_user: Optional[dict] = Depends(get_current_user_or_guest)
 ):
-    # --- SỬA Ở ĐÂY: Thêm await ---
-    return await ThreadController().create_thread(db=db, thread_data=data, payload=payload)
+    controller = ThreadController()
+    
+    # Lấy ID user (nếu có)
+    viewer_id = current_user.get("user_id") if current_user else None
+    
+    return await controller.get_list_threads(
+        db=db, 
+        page=page, 
+        limit=limit, 
+        category_id=category_id, 
+        tag=tag,
+        current_user_id=viewer_id # <-- Truyền vào Controller
+    )
 
-# 1. API: XEM CHI TIẾT (Ai cũng xem được, không cần login -> Không cần dependencies user)
+# --- CREATE ---
+@router_thead.post("/", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
+async def create_thread(
+    # Dùng Depends để parse Form Data
+    form_data: ThreadCreateForm = Depends(ThreadCreateForm.as_form),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user) # Bắt buộc login
+):
+    controller = ThreadController()
+    return await controller.create_thread(db, form_data, current_user)
+
+# --- GET DETAIL ---
 @router_thead.get("/{thread_id}", response_model=ThreadResponse)
 async def get_thread_detail(
     thread_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[dict] = Depends(get_current_user_or_guest)
 ):
-    return await ThreadController().get_thread(db=db, thread_id=thread_id)
+    controller = ThreadController()
+    viewer_id = current_user.get("user_id") if current_user else None
+    
+    return await controller.get_thread(db, thread_id, viewer_id)
 
-
-# 2. API: CẬP NHẬT (Phải login -> Có Depends user)
+# --- UPDATE ---
 @router_thead.put("/{thread_id}", response_model=ThreadResponse)
 async def update_thread(
     thread_id: str,
-    # Dùng ThreadUpdateForm.as_form
-    data: ThreadUpdateForm = Depends(ThreadUpdateForm.as_form), 
+    form_data: ThreadUpdateForm = Depends(ThreadUpdateForm.as_form),
     db: Session = Depends(get_db),
-    payload: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
-    return await ThreadController().update_thread(
-        db=db, 
-        thread_id=thread_id, 
-        thread_data=data, 
-        payload=payload
-    )
+    controller = ThreadController()
+    return await controller.update_thread(db, thread_id, form_data, current_user)
 
-
-# 3. API: XÓA (Phải login)
+# --- DELETE ---
 @router_thead.delete("/{thread_id}")
 async def delete_thread(
     thread_id: str,
     db: Session = Depends(get_db),
-    payload: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
-    return await ThreadController().delete_thread(
-        db=db, 
-        thread_id=thread_id, 
-        payload=payload
-    )
+    controller = ThreadController()
+    return await controller.delete_thread(db, thread_id, current_user)

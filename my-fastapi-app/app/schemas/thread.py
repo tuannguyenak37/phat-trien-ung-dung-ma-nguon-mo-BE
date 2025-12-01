@@ -3,8 +3,9 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import json
+from .votes import VoteStats
 
-# --- INPUT FORM ---
+# --- INPUT FORM (Giữ nguyên) ---
 class ThreadCreateForm(BaseModel):
     title: str
     content: str
@@ -15,9 +16,8 @@ class ThreadCreateForm(BaseModel):
     @classmethod
     def as_form(
         cls,
-        
-        title: str = Form(...),         
-        content: str = Form(...),       
+        title: str = Form(...),
+        content: str = Form(...),
         category_id: str = Form(...),
         tags: Optional[str] = Form(None),
         files: Optional[List[UploadFile]] = File(None)
@@ -36,6 +36,7 @@ class ThreadCreateForm(BaseModel):
             files=files
         )
 
+# --- RESPONSE SCHEMAS ---
 
 class TagResponse(BaseModel):
     tag_id: str
@@ -50,6 +51,7 @@ class MediaResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# 👇 CẬP NHẬT CLASS NÀY QUAN TRỌNG NHẤT
 class ThreadResponse(BaseModel):
     thread_id: str
     user_id: str
@@ -57,8 +59,19 @@ class ThreadResponse(BaseModel):
     title: str
     content: str
     created_at: datetime
+    
+    # ✅ 1. Thêm 3 trường đếm (Counter) mới từ Database
+    # Frontend sẽ dùng cái này để hiển thị số lượng ngay lập tức
+    comment_count: int = 0
+    upvote_count: int = 0
+    downvote_count: int = 0
+
+    # ✅ 2. Các quan hệ (Relationships)
     tags: List[TagResponse] = []   
     media: List[MediaResponse] = []  
+    
+    
+    
     class Config:
         from_attributes = True
 
@@ -68,7 +81,6 @@ class ThreadUpdateForm(BaseModel):
     content: Optional[str] = None
     category_id: Optional[str] = None
     tags: Optional[List[str]] = None
-    # Để đơn giản, tạm thời update ta chỉ sửa text, chưa xử lý thay đổi file/media phức tạp
     
     @classmethod
     def as_form(
@@ -91,8 +103,9 @@ class ThreadUpdateForm(BaseModel):
             category_id=category_id,
             tags=parsed_tags
         )
+
 class ThreadListResponse(BaseModel):
     total: int
     page: int
     size: int
-    data: List[ThreadResponse]
+    data: List[ThreadResponse] # Sẽ sử dụng cấu trúc mới ở trên

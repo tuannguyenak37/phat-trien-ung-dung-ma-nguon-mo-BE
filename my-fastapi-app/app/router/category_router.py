@@ -7,7 +7,7 @@ from ..schemas.category import CategoryCreate, CategoryResponse,categoryDelete,c
 # Import Controller
 from app.controller.category_controller import category_controller 
 # Import Permission Middleware
-from ..middweare.JWT.authAdmin import require_admin 
+from ..middleware.JWT.authAdmin import require_admin 
 router = APIRouter()
 
 

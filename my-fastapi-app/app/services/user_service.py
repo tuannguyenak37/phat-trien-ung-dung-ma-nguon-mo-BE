@@ -3,7 +3,7 @@ from ..models.users import Users
 from ..schemas.user import UserCreate,Login
 from fastapi import  HTTPException,status
 import bcrypt
-from app.middweare.JWT.token import access_Token, refresh_token
+from app.middleware.JWT.token import access_Token, refresh_token
 
 # --- Hash mật khẩu ---
 def hash_password(password: str) -> str:
