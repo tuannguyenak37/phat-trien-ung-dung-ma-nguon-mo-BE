@@ -1,17 +1,15 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional
 from datetime import datetime
 from enum import Enum
-import bcrypt
-
-
-# --- Kiểm tra mật khẩu ---
-def check_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 # --- Enum role ---
 class UserRole(str, Enum):
     USER = "user"
     ADMIN = "admin"
+class UserStatus(str, Enum):
+    ACTIVE = "active"
+    BANNED = "banned"
 
 # --- Pydantic model input ---
 class UserCreate(BaseModel):
@@ -46,7 +44,7 @@ class resposLogin(BaseModel):
      refresh_token:str
      url_avatar: str | None = None
      description: str | None = None
-     url_bg :str | None = None
+     url_background: str | None = None
      reputation_score: int
 class Config:
         from_attributes = True
@@ -59,7 +57,7 @@ class UserpublicResponse(BaseModel):
     lastName:str
     url_avatar: str | None = None
     description: str | None = None
-    url_bg :str | None = None
+    url_background: str | None = None
     reputation_score: int
     
 
@@ -70,3 +68,26 @@ class  Userpublic(BaseModel):
 
     class Config:
         from_attributes = True
+# 1. Schema sửa Avatar
+class UpdateAvatarRequest(BaseModel):
+    url_avatar: str
+
+# 2. Schema sửa Background
+class UpdateBackgroundRequest(BaseModel):
+    url_background: str
+
+# 3. Schema sửa Mô tả
+class UpdateInfoRequest(BaseModel):
+    firstName: str
+    lastName: str
+    description: str
+
+# 4. Schema đổi Mật khẩu
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=6) # Validate độ dài tối thiểu
+
+# 5. Schema đổi Email
+class ChangeEmailRequest(BaseModel):
+    password: str # Cần xác nhận mật khẩu trước khi đổi email
+    new_email: EmailStr

@@ -113,6 +113,5 @@ async def get_dashboard_stats(
     end_date: Optional[date] = Query(None, description="Ngày kết thúc (YYYY-MM-DD)"),
     db: AsyncSession = Depends(get_async_db)
 ):
-    controller = UserManagementController.get_stats()
-    # Truyền 2 tham số này xuống Controller
+    controller = UserManagementController()
     return await controller.get_stats(db=db, start_date=start_date, end_date=end_date)
