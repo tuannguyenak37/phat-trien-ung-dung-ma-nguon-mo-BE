@@ -4,7 +4,6 @@ from fastapi import HTTPException, status
 
 from ..models.categories import Categories
 from ..schemas.category import CategoryCreate
-
 class CategoryService:
 
     
@@ -28,7 +27,7 @@ class CategoryService:
             slug=slug,
             description=category_in.description
         )
-
+       
         # 4. Lưu và commit
         db.add(new_category)
         db.commit()

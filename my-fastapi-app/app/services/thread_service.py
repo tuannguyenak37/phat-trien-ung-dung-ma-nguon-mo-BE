@@ -8,7 +8,7 @@ from app.models.thread import Thread, ThreadMedia
 from app.models.tags import Tags
 from app.schemas.thread import ThreadCreateForm, ThreadUpdateForm
 from app.middleware.upload.upload_file import upload_service
-
+from app.utils.reputation_score import update_reputation
 class ThreadService:
 
     # 1. TẠO BÀI VIẾT (CREATE)
@@ -56,6 +56,10 @@ class ThreadService:
                         sort_order=idx
                     )
                     db.add(new_media)
+
+        await update_reputation(db=db, user_id=user_id, amount=5)
+
+        
 
         # D. Commit & Refresh
         db.commit()

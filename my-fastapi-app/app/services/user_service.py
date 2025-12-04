@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from ..models.users import Users
+from ..models.users import Users, UserStatus
 from ..schemas.user import UserCreate,Login
 from fastapi import  HTTPException,status
 import bcrypt
@@ -41,12 +41,17 @@ class UserService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=" email hoặc  mật khẩu sai")
         if not bcrypt.checkpw( user.password.encode('utf-8'),data.password.encode('utf-8')):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sai mật khẩu")
+        if data.status == UserStatus.BANNED:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=" tài khoản bạn đã vi phạm quy chế hoạt động  vui lòng liên hệ qua email quản trị :23050150@student.bdu.edu.vn")
         
         payload = {
     "user_id": data.user_id,
     "firstName": data.firstName,
     "lastName": data.lastName,
-    "role": data.role
+    "role": data.role,
+    "reputation_score" : data.reputation_score,
+    "url_avatar": data.url_avatar,
+    "description":data.description
         }
 
         access_TokenNew = access_Token(payload)
@@ -54,7 +59,12 @@ class UserService:
         return{"access_token":access_TokenNew,"refresh_token":refresh_tokenNew, "user_id": data.user_id,
     "firstName": data.firstName,
     "lastName": data.lastName,
-    "role": data.role}
+    "role": data.role,
+    "reputation_score" : data.reputation_score,
+    "url_avatar": data.url_avatar,
+    "description":data.description
+    
+    }
 
         
         

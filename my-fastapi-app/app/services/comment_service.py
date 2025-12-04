@@ -4,6 +4,8 @@ from fastapi import HTTPException, status
 from app.models.comment import Comment
 from app.models.thread import Thread
 from app.schemas.comment import CommentCreateForm, CommentUpdateForm
+from app.utils.reputation_score  import update_reputation
+
 
 class CommentService:
     
@@ -29,6 +31,7 @@ class CommentService:
             parent_comment_id=form_data.parent_comment_id,
             content=form_data.content
         )
+        await update_reputation(db=db, user_id=user_id, amount=3)
         db.add(new_comment)
         
         # --- CẬP NHẬT COUNTER ---

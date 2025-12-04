@@ -1,4 +1,4 @@
-from .users import Users, UserRole         # .users (số nhiều) -> Users (Class)
+from .users import Users, UserRole ,UserStatus        # .users (số nhiều) -> Users (Class)
 from .categories import Categories         # .categories (số nhiều) -> Categories (Class)
 from .tags import Tags, thread_tags        # .tags (số nhiều) -> Tags (Class)
 from .thread import Thread, ThreadMedia    # .thread (số ít)
@@ -7,7 +7,7 @@ from .vote import Vote                     # .vote (số ít)
 from ..db.connection import Base
 __all__ = [
     "Base",
-    "Users", "UserRole",
+    "Users", "UserRole","UserStatus",
     "Categories",
     "Tags", "thread_tags",
     "Thread", "ThreadMedia",

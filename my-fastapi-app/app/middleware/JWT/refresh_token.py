@@ -4,7 +4,9 @@ from jose import jwt, JWTError
 from ..config import SECRET_KEY, ALGORITHM
 from .token import access_Token # Hàm tạo token của bạn
 from .auth import get_current_user
-
+from app.db.connection import get_db
+from sqlalchemy.orm import Session
+from app.models.users import Users
 router_token = APIRouter()
 
 # 👇 API này Frontend sẽ gọi khi bị lỗi 401
@@ -26,7 +28,11 @@ def refresh_access_token(
            "user_id": payload.get("user_id"),
             "role": payload.get("role"),
             "firstName": payload.get("firstName"),
-            "lastName": payload.get("lastName")
+            "lastName": payload.get("lastName"),
+              "reputation_score" : payload.get("reputation_score"),
+              "url_avatar": payload.get("url_avatar"),
+                "description":payload.get("description")
+            
         }
 
         # 3. Tạo Access Token mới
@@ -45,19 +51,34 @@ def refresh_access_token(
             detail="Refresh token expired"
         )
 @router_token.get("/api/users/me")
-async def read_users_me(current_user: dict = Depends(get_current_user)):
+async def read_users_me(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)  # <--- SỬA 1: Chuyển Depends vào tham số
+):
     """
-    Endpoint này chỉ chạy khi token hợp lệ.
-    Biến 'current_user' chính là dữ liệu trả về từ hàm verify ở trên.
+    Endpoint này lấy thông tin user mới nhất từ DB dựa trên Token.
     """
-    return {
     
+    # <--- SỬA 2 & 3: Bỏ 'await', sửa 'Users.id' thành 'Users.user_id'
+    user_in_db = db.query(Users).filter(Users.user_id == current_user.get("user_id")).first()
+
+    if not user_in_db:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Log kiểm tra (tuỳ chọn)
+    print("Dữ liệu từ DB:", user_in_db.reputation_score)
+
+    # Nên lấy dữ liệu từ 'user_in_db' (DB) thay vì 'current_user' (Token)
+    # Vì Token có thể cũ (ví dụ user vừa đổi avatar xong, token chưa cập nhật)
+    return {
         "success": True,
         "user": {
-            "user_id": current_user.get("user_id"),
-            "role": current_user.get("role"),
-            "firstName": current_user.get("firstName"),
-            "lastName": current_user.get("lastName")
-            # Trả về bất cứ thứ gì bạn đã lưu trong token
+            "user_id": user_in_db.user_id,
+            "role": user_in_db.role, # Lấy từ DB luôn cho chuẩn
+            "firstName": user_in_db.firstName,
+            "lastName": user_in_db.lastName,
+            "reputation_score": user_in_db.reputation_score, # <--- Mục tiêu chính của bạn
+            "url_avatar": user_in_db.url_avatar,
+            "description": user_in_db.description
         }
     }

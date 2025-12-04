@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from .comment import Comment
     from .vote import Vote
 
+class UserStatus(str, enum.Enum):
+    ACTIVE = "active"     # Đang hoạt động bình thường
+    BANNED = "banned"     # Đã bị khóa bởi Admin/Mod
 class UserRole(str, enum.Enum):
     USER = "user"       
     ADMIN = "admin"
@@ -34,7 +37,8 @@ class Users(Base):
     password = Column(String(255), nullable=False)
     firstName = Column(String(50), nullable=False)
     lastName = Column(String(100), nullable=False)
-    
+    status = Column(Enum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
+
     role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
     reputation_score = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

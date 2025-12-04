@@ -9,6 +9,7 @@ app = FastAPI()
 from fastapi.staticfiles import StaticFiles
 from app.router.vote import router as router_vote
 from app.router.comment_router import router as router_cmt
+from app.router.admin.account_admin import router as router_account
 # Cấu hình CORS
 origins = [
     "http://localhost:3000",  # URL front-end của bạn
@@ -36,7 +37,9 @@ app.include_router(router_public, prefix="/api", tags=["public"])
 app.include_router(router_thead, prefix="/api", tags=["threads"])
 app.include_router(router, prefix="/api/catcategory", tags=["category"])
 app.include_router(router_cmt, prefix="/api/cmt")
+
 app.include_router(router_vote,prefix="/api")
+app.include_router(router_account,prefix="/api")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Route có tham số

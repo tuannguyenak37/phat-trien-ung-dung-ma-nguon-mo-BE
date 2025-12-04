@@ -32,6 +32,8 @@ class VoteService:
             user_id=user_id, thread_id=thread_id, comment_id=comment_id, value=value
         )
         self.db.add(new_vote)
+        
+
 
         # 2. Cập nhật Counter
         self._update_counter(thread_id, comment_id, value, is_increment=True)
