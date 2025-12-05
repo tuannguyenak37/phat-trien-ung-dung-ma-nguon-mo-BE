@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Integer, SmallInteger
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Integer, SmallInteger,event
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import TSVECTOR
@@ -7,13 +7,24 @@ from typing import TYPE_CHECKING, List
 from ..db.connection import Base
 from ..utils.createID import createID
 from .tags import thread_tags 
-
+from slugify import slugify # <--- Import slugify
 if TYPE_CHECKING:
     from .users import Users
     from .categories import Categories
     from .tags import Tags
     from .comment import Comment
     from .vote import Vote
+
+# --- HÀM TỰ ĐỘNG TẠO SLUG CHO THREAD ---
+def generate_thread_slug(mapper, connection, target):
+    # Logic: Nếu có Title và Slug đang trống thì tự tạo
+    if target.title and not target.slug:
+        target.slug = slugify(target.title)
+
+    # Nếu đang update Title, có muốn đổi luôn Slug không?
+    # Thường là CÓ để URL đồng bộ với tiêu đề mới
+    if target.title:
+         target.slug = slugify(target.title)
 
 class Thread(Base):
     __tablename__ = "threads"
@@ -50,6 +61,7 @@ class Thread(Base):
     media = relationship("ThreadMedia", back_populates="thread", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="thread", cascade="all, delete-orphan")
     votes = relationship("Vote", back_populates="thread", cascade="all, delete-orphan")
+    slug = Column(String(100), unique=True, index=True, nullable=False)
 
 class ThreadMedia(Base):
     __tablename__ = "thread_media"
@@ -63,3 +75,7 @@ class ThreadMedia(Base):
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     thread = relationship("Thread", back_populates="media")
+
+# Lắng nghe sự kiện
+event.listen(Thread, 'before_insert', generate_thread_slug)
+event.listen(Thread, 'before_update', generate_thread_slug)

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession # <--- 1. Dùng AsyncSession
 from typing import Optional
 
-from app.db.connection import get_db
+# 2. Dùng get_async_db
+from app.db.connection import get_async_db 
 from app.schemas.comment import CommentCreateForm, CommentResponse, CommentUpdateForm, CommentListResponse
 from app.controller.comment_controller import CommentController
 from app.middleware.JWT.auth import get_current_user, get_current_user_or_guest
@@ -16,8 +17,9 @@ router = APIRouter(
 @router.post("/", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_comment(
     payload: CommentCreateForm,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user) # Bắt buộc login
+    # 👇 Đổi sang AsyncSession
+    db: AsyncSession = Depends(get_async_db), 
+    current_user: dict = Depends(get_current_user)
 ):
     controller = CommentController()
     return await controller.create_comment(db, payload, current_user)
@@ -29,8 +31,9 @@ async def get_comments(
     parent_comment_id: Optional[str] = None, 
     page: int = 1,
     limit: int = 10,
-    db: Session = Depends(get_db),
-    current_user: Optional[dict] = Depends(get_current_user_or_guest) # Khách cũng xem được
+    # 👇 Đổi sang AsyncSession
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_or_guest)
 ):
     controller = CommentController()
     viewer_id = current_user.get("user_id") if current_user else None
@@ -49,7 +52,8 @@ async def get_comments(
 async def update_comment(
     comment_id: str,
     form_data: CommentUpdateForm,
-    db: Session = Depends(get_db),
+    # 👇 Đổi sang AsyncSession
+    db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user)
 ):
     controller = CommentController()
@@ -59,7 +63,8 @@ async def update_comment(
 @router.delete("/{comment_id}")
 async def delete_comment(
     comment_id: str,
-    db: Session = Depends(get_db),
+    # 👇 Đổi sang AsyncSession
+    db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user)
 ):
     controller = CommentController()

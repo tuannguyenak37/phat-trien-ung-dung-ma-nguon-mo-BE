@@ -1,81 +1,104 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc, func
+from sqlalchemy.orm import joinedload
 from fastapi import HTTPException, status
+
 from app.models.comment import Comment
 from app.models.thread import Thread
 from app.schemas.comment import CommentCreateForm, CommentUpdateForm
-from app.utils.reputation_score  import update_reputation
-
+from app.utils.reputation_score import update_reputation
 
 class CommentService:
     
     # --- 1. TẠO COMMENT & TĂNG COUNTER ---
     @staticmethod
-    async def create_comment(db: Session, user_id: str, form_data: CommentCreateForm):
-        # Kiểm tra bài viết
-        thread = db.query(Thread).filter(Thread.thread_id == form_data.thread_id).first()
+    async def create_comment(db: AsyncSession, user_id: str, form_data: CommentCreateForm):
+        # 1. Kiểm tra bài viết
+        # Dùng await db.get() là cách nhanh nhất để lấy theo ID
+        thread = await db.get(Thread, form_data.thread_id)
         if not thread:
             raise HTTPException(status_code=404, detail="Thread not found")
 
-        # Kiểm tra cha (nếu là reply)
+        # 2. Kiểm tra cha (nếu là reply)
         parent_comment = None
         if form_data.parent_comment_id:
-            parent_comment = db.query(Comment).filter(Comment.comment_id == form_data.parent_comment_id).first()
+            parent_comment = await db.get(Comment, form_data.parent_comment_id)
             if not parent_comment:
                 raise HTTPException(status_code=404, detail="Parent comment not found")
 
-        # Tạo comment
+        # 3. Tạo comment
         new_comment = Comment(
             user_id=user_id,
             thread_id=form_data.thread_id,
             parent_comment_id=form_data.parent_comment_id,
             content=form_data.content
         )
+        
+        # Tăng điểm uy tín
         await update_reputation(db=db, user_id=user_id, amount=3)
+        
         db.add(new_comment)
         
         # --- CẬP NHẬT COUNTER ---
-        # 1. Tăng tổng comment của Thread
+        # 4. Tăng tổng comment của Thread
         thread.comment_count += 1
         
-        # 2. Nếu là Reply, tăng reply_count của Comment Cha
+        # 5. Nếu là Reply, tăng reply_count của Comment Cha
         if parent_comment:
             parent_comment.reply_count += 1
 
-        db.commit()
-        db.refresh(new_comment)
-        return new_comment
+        await db.commit()
+        await db.refresh(new_comment)
+        
+        # Load thêm User để trả về API (tránh lỗi MissingGreenlet)
+        # Query lại comment vừa tạo kèm theo User info
+        query = select(Comment).options(joinedload(Comment.user)).filter(Comment.comment_id == new_comment.comment_id)
+        result = await db.execute(query)
+        
+        return result.scalar_one()
 
-    # --- 2. LẤY DANH SÁCH (SỬA LỖI FILTER NONE) ---
+    # --- 2. LẤY DANH SÁCH ---
     @staticmethod
     async def get_comments(
-        db: Session, 
+        db: AsyncSession, 
         thread_id: str = None, 
         parent_comment_id: str = None, 
         skip: int = 0, 
         limit: int = 10
     ):
-        query = db.query(Comment)
+        # Tạo câu query cơ bản
+        query = select(Comment).options(joinedload(Comment.user)) # Load User info
 
-        # TRƯỜNG HỢP A: Lấy Reply của một comment
+        # TRƯỜNG HỢP A: Lấy Reply
         if parent_comment_id:
             query = query.filter(Comment.parent_comment_id == parent_comment_id)
             
-        # TRƯỜNG HỢP B: Lấy Comment gốc của bài viết
+            # Để đếm tổng số (cho phân trang), ta cần query riêng
+            count_stmt = select(func.count()).select_from(Comment).filter(Comment.parent_comment_id == parent_comment_id)
+
+        # TRƯỜNG HỢP B: Lấy Comment gốc
         elif thread_id:
-            # 👇 QUAN TRỌNG: Dùng .is_(None) để lọc đúng chuẩn SQL
             query = query.filter(
+                Comment.thread_id == thread_id,
+                Comment.parent_comment_id.is_(None) 
+            )
+            count_stmt = select(func.count()).select_from(Comment).filter(
                 Comment.thread_id == thread_id,
                 Comment.parent_comment_id.is_(None) 
             )
         else:
             return {"total": 0, "data": []}
 
-        # Sắp xếp: Nhiều Tim nhất -> Mới nhất
-        query = query.order_by(desc(Comment.upvote_count), desc(Comment.created_at))
+        # 1. Thực thi đếm tổng số trước
+        total_res = await db.execute(count_stmt)
+        total = total_res.scalar() or 0
 
-        total = query.count()
-        comments = query.offset(skip).limit(limit).all()
+        # 2. Thực thi lấy dữ liệu (Sắp xếp & Phân trang)
+        query = query.order_by(desc(Comment.upvote_count), desc(Comment.created_at))
+        query = query.offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        comments = result.scalars().all()
 
         return {
             "total": total,
@@ -86,8 +109,11 @@ class CommentService:
 
     # --- 3. SỬA COMMENT ---
     @staticmethod
-    async def update_comment(db: Session, comment_id: str, user_id: str, form_data: CommentUpdateForm):
-        comment = db.query(Comment).filter(Comment.comment_id == comment_id).first()
+    async def update_comment(db: AsyncSession, comment_id: str, user_id: str, form_data: CommentUpdateForm):
+        # Tìm comment
+        query = select(Comment).filter(Comment.comment_id == comment_id)
+        result = await db.execute(query)
+        comment = result.scalar_one_or_none()
         
         if not comment:
             raise HTTPException(status_code=404, detail="Comment not found")
@@ -95,17 +121,21 @@ class CommentService:
         if comment.user_id != user_id:
             raise HTTPException(status_code=403, detail="Not authorized to edit")
 
+        # Cập nhật
         comment.content = form_data.content
-        # updated_at tự động nhảy nhờ onupdate trong Model
         
-        db.commit()
-        db.refresh(comment)
-        return comment
+        await db.commit()
+        await db.refresh(comment)
+        
+        # Load lại user để trả về
+        query_full = select(Comment).options(joinedload(Comment.user)).filter(Comment.comment_id == comment_id)
+        return (await db.execute(query_full)).scalar_one()
 
     # --- 4. XÓA COMMENT & GIẢM COUNTER ---
     @staticmethod
-    async def delete_comment(db: Session, comment_id: str, user_id: str, role: str):
-        comment = db.query(Comment).filter(Comment.comment_id == comment_id).first()
+    async def delete_comment(db: AsyncSession, comment_id: str, user_id: str, role: str):
+        # Tìm comment
+        comment = await db.get(Comment, comment_id)
         
         if not comment:
             raise HTTPException(status_code=404, detail="Comment not found")
@@ -115,16 +145,16 @@ class CommentService:
 
         # --- GIẢM COUNTER ---
         # 1. Giảm tổng comment của Thread
-        thread = db.query(Thread).get(comment.thread_id)
+        thread = await db.get(Thread, comment.thread_id)
         if thread and thread.comment_count > 0:
             thread.comment_count -= 1
             
         # 2. Nếu là Reply, giảm reply_count của Cha
         if comment.parent_comment_id:
-            parent = db.query(Comment).get(comment.parent_comment_id)
+            parent = await db.get(Comment, comment.parent_comment_id)
             if parent and parent.reply_count > 0:
                 parent.reply_count -= 1
 
-        db.delete(comment)
-        db.commit()
+        await db.delete(comment)
+        await db.commit()
         return {"message": "Deleted successfully"}

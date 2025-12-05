@@ -1,20 +1,24 @@
-from sqlalchemy.orm import Session
-from slugify import slugify # pip install python-slugify
+from sqlalchemy.ext.asyncio import AsyncSession # <--- 1. Dùng AsyncSession
+from sqlalchemy import select # <--- 2. Dùng select
+from slugify import slugify 
 from fastapi import HTTPException, status
 
 from ..models.categories import Categories
-from ..schemas.category import CategoryCreate
+from ..schemas.category import CategoryCreate, categoryEdit # Nhớ import categoryEdit
+
 class CategoryService:
 
-    
-
+    # --- 1. CREATE ---
     @staticmethod
-    def create_category(db: Session, category_in: CategoryCreate):
-        # 1. Xử lý Logic nghiệp vụ: Tạo slug
+    async def create_category(db: AsyncSession, category_in: CategoryCreate): # <--- async def
+        # 1. Tạo slug để check trùng
         slug = slugify(category_in.name)
 
-        # 2. Kiểm tra trùng lặp (Logic DB)
-        existing_category = db.query(Categories).filter(Categories.slug == slug).first()
+        # 2. Kiểm tra trùng lặp (Async Query)
+        query = select(Categories).filter(Categories.slug == slug)
+        result = await db.execute(query) # <--- await execute
+        existing_category = result.scalar_one_or_none()
+        
         if existing_category:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
@@ -28,54 +32,74 @@ class CategoryService:
             description=category_in.description
         )
        
-        # 4. Lưu và commit
+        # 4. Lưu và commit (Async)
         db.add(new_category)
-        db.commit()
-        db.refresh(new_category)
+        await db.commit() # <--- await commit
+        await db.refresh(new_category) # <--- await refresh
         
         return new_category
     
+    # --- 2. DELETE ---
     @staticmethod
-    def delete_category(db: Session, category_id: str):
-        category = db.query(Categories).filter(Categories.category_id == category_id).first()
+    async def delete_category(db: AsyncSession, category_id: str):
+        # Tìm category
+        query = select(Categories).filter(Categories.category_id == category_id)
+        result = await db.execute(query)
+        category = result.scalar_one_or_none()
+        
         if not category:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Category not found"
             )
-        db.delete(category)
-        db.commit()
+        
+        # Xóa (Async)
+        await db.delete(category) # <--- await delete
+        await db.commit()
         return {"detail": "Category deleted successfully"}
+
+    # --- 3. EDIT ---
     @staticmethod
-    def edit_category(db: Session, category_id: str, category_in: CategoryCreate):
-        category = db.query(Categories).filter(Categories.category_id == category_id).first()
+    async def edit_category(db: AsyncSession, category_id: str, category_in: categoryEdit):
+        # Tìm category
+        query = select(Categories).filter(Categories.category_id == category_id)
+        result = await db.execute(query)
+        category = result.scalar_one_or_none()
+
         if not category:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Category not found"
             )
+        
+        # Cập nhật thông tin
         if category_in.name:
             category.name = category_in.name
+            # Tự động cập nhật slug nếu đổi tên
             category.slug = slugify(category_in.name)
+            
         if category_in.description:
             category.description = category_in.description
-        db.commit()
-        db.refresh(category)
+            
+        await db.commit() # <--- await commit
+        await db.refresh(category)
         return category
 
+    # --- 4. GET ALL ---
     @staticmethod
-    def get_all(db: Session):
-        return db.query(Categories).all()
+    async def get_all(db: AsyncSession):
+        query = select(Categories)
+        result = await db.execute(query)
+        return result.scalars().all() # <--- scalars().all() để lấy list
     
+    # --- 5. GET FOR THREAD (Logic giống get_all) ---
     @staticmethod
-    def get_category_thead(db: Session):
-        categories = db.query(Categories).all()
-        # Lưu ý: Nếu muốn trả về rỗng thay vì lỗi 404 khi không có category nào
-        # thì bỏ đoạn check len == 0 đi. Thường list rỗng vẫn là valid response (200 OK).
+    async def get_category_thead(db: AsyncSession):
+        query = select(Categories)
+        result = await db.execute(query)
+        categories = result.scalars().all()
+        
         if not categories: 
-             # Tùy logic: Có thể raise lỗi hoặc return []
-             # Nếu raise 404 ở đây thì client sẽ nhận lỗi thay vì list rỗng
-             # raise HTTPException(status_code=404, detail="Category not found")
              return [] 
              
         return categories

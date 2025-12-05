@@ -1,34 +1,41 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException,status,Response
-from ..schemas.user import UserCreate,Login
-from ..services.user_service  import UserService
+from sqlalchemy.ext.asyncio import AsyncSession # <--- 1. Dùng AsyncSession
+from sqlalchemy import select # <--- 2. Import select để query
+from fastapi import HTTPException, status, Response
+
+from ..schemas.user import UserCreate, Login
+from ..services.user_service import UserService
 from app.models.users import Users
+
 class UserController:
+    
+    # --- 1. ĐĂNG KÝ ---
     @staticmethod
-    def create_user(db: Session,user_data: UserCreate):
-        # Check trùng Email
-        if UserService.get_user_by_email(db, email=user_data.email):
+    async def create_user(db: AsyncSession, user_data: UserCreate): # <--- async def
+        # Gọi Service kiểm tra email (Thêm await)
+        if await UserService.get_user_by_email(db, email=user_data.email):
             raise HTTPException(
                 status_code=400, 
                 detail="Email này đã được đăng ký."
             )
 
-      
-        return UserService.create_new_user(db=db,user_data=user_data)
-    @staticmethod
-    def login_controller(db: Session, user_data: Login,response =Response):
-        # Gọi service để login
-        res = UserService.login(db, user=user_data)
+        # Gọi Service tạo user (Thêm await)
+        return await UserService.create_new_user(db=db, user_data=user_data)
 
-        # Nếu service trả về None hoặc False → ném exception
+    # --- 2. ĐĂNG NHẬP ---
+    @staticmethod
+    async def login_controller(db: AsyncSession, user_data: Login, response: Response): # <--- async def
+        # Gọi service để login (Thêm await)
+        res = await UserService.login(db, user=user_data)
+
         if not res:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Có lỗi xảy ra, vui lòng thử lại sau"
+                detail="Tài khoản hoặc mật khẩu không chính xác"
             )
+        
         refresh_token = res["refresh_token"]
 
-        # ⚡ Dùng response instance
+        # Set Cookie (Giữ nguyên logic)
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
@@ -38,15 +45,23 @@ class UserController:
         )
 
         return res
+
+    # --- 3. LẤY PROFILE PUBLIC ---
     @staticmethod
-    def get_profile_public(db: Session,user_id:str):
-        user = db.query(Users).filter(Users.user_id == user_id).first()
+    async def get_profile_public(db: AsyncSession, user_id: str): # <--- async def
+        # ⚠️ QUAN TRỌNG: Không dùng db.query() được nữa
+        # Phải dùng select() và await db.execute()
+        
+        query = select(Users).filter(Users.user_id == user_id)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none() # Lấy 1 dòng hoặc None
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        user.password_hash = None  # Ẩn thông tin mật khẩu
+        
+        # Ẩn mật khẩu thủ công (Hoặc để Pydantic lo việc này thì tốt hơn)
+        # user.password_hash = None 
         return user
-
-    
