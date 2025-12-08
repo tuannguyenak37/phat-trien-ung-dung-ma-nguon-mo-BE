@@ -1,9 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, delete, func,or_,desc
+from sqlalchemy import select, desc, delete, func,or_,desc,case
 from sqlalchemy.orm import joinedload
 from fastapi import HTTPException, status
 from typing import List, Optional
-
+from sqlalchemy.orm import joinedload, selectinload
 # Import Models & Schemas
 from app.models.thread import Thread, ThreadMedia
 from app.models.tags import Tags
@@ -11,7 +11,7 @@ from app.models.categories import Categories # Import để join khi tìm theo s
 from app.schemas.thread import ThreadCreateForm, ThreadUpdateForm
 from app.middleware.upload.upload_file import upload_service
 from app.utils.reputation_score import update_reputation
-
+from datetime import datetime, timedelta
 class ThreadService:
 
     # --- 1. TẠO BÀI VIẾT ---
@@ -232,36 +232,97 @@ class ThreadService:
         await db.commit()
         return {"message": "Thread deleted successfully"}
     
-    # --- 7. LẤY DANH SÁCH (Feed) ---
+    # --- LẤY DANH SÁCH (HOME FEED & SEARCH) ---
     @staticmethod
-    async def get_threads(
-        db: AsyncSession, 
-        skip: int = 0, 
-        limit: int = 10, 
+    async def get_threadsHome(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 10,
         category_id: Optional[str] = None,
-        tag_name: Optional[str] = None
-    ):
+        tag_name: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: str = "mix",
+        ):
+        
+       
+        # 1. Base Query
+        # Dùng selectinload cho Tags (quan hệ 1-N) để tối ưu và tránh duplicates
         query = select(Thread).options(
-            joinedload(Thread.tags),
+            selectinload(Thread.tags),
             joinedload(Thread.media),
             joinedload(Thread.user),
             joinedload(Thread.category)
         )
 
-        if category_id:
-            query = query.filter(Thread.category_id == category_id)
-        
+        # 2. Filter & Join
+        # Chỉ join khi cần filter để tăng tốc độ
         if tag_name:
             query = query.join(Thread.tags).filter(Tags.name == tag_name)
+        
+        if category_id:
+            query = query.filter(Thread.category_id == category_id)
 
-        query = query.order_by(desc(Thread.created_at))
+        # 3. Search Logic
+        if search:
+            search_fmt = f"%{search}%"
+            # Outerjoin để tìm kiếm không bị mất bài viết nếu chưa có tag/category
+            query = query.outerjoin(Thread.category).outerjoin(Thread.tags)
+            query = query.filter(
+                or_(
+                    Thread.title.ilike(search_fmt),
+                    Thread.content.ilike(search_fmt),
+                    Categories.name.ilike(search_fmt),
+                    Tags.name.ilike(search_fmt)
+                )
+            )
+
+        # 4. GROUP BY (Thay thế DISTINCT)
+        # Bắt buộc dùng Group By nếu có join 1-N (Tags) hoặc Search để tránh lỗi logic SQL khi Sort
+        if tag_name or search:
+             query = query.group_by(Thread.thread_id)
+
+        # 5. SORTING ALGORITHM
+        if sort_by == "trending":
+            # Logic: Chỉ tính điểm cho bài trong 7 ngày qua
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            
+            # Dùng 'case' của SQL: Nếu bài cũ hơn 7 ngày -> điểm = 0
+            is_recent = case((Thread.created_at >= seven_days_ago, 1), else_=0)
+            
+            # Công thức: (Upvote + Comment*2) * (1 hoặc 0)
+            trending_score = (Thread.upvote_count + (Thread.comment_count * 2)) * is_recent
+            
+            query = query.order_by(desc(trending_score), desc(Thread.created_at))
+
+        elif sort_by == "newest":
+            query = query.order_by(desc(Thread.created_at))
+
+        else: # "mix" (Mặc định)
+            # Logic: Hackernews/Reddit simplify style
+            # extract('epoch') đổi thời gian ra số giây
+            post_time = func.extract('epoch', Thread.created_at)
+            
+            # 1 Upvote = "trẻ lại" 1 giờ (3600s), 1 Comment = 2 giờ
+            bonus_time = (Thread.upvote_count * 3600) + (Thread.comment_count * 7200)
+            
+            mix_score = post_time + bonus_time
+            query = query.order_by(desc(mix_score))
+
+        # 6. COUNT (Tối ưu)
+        # Quan trọng: Phải loại bỏ order_by() trước khi count để query chạy nhanh hơn
+        # và tránh lỗi subquery
+        count_query = select(func.count()).select_from(query.order_by(None).subquery())
+        total_res = await db.execute(count_query)
+        total = total_res.scalar() or 0
+
+        # 7. EXECUTE & PAGINATION
         query = query.offset(skip).limit(limit)
         
         result = await db.execute(query)
         threads = result.unique().scalars().all()
 
         return {
-            "total": 0, # Tạm để 0, có thể implement count riêng
+            "total": total,
             "page": (skip // limit) + 1,
             "size": limit,
             "data": threads

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession # <--- Dùng AsyncSession
 from typing import Optional, List
 
 # Import Schemas
-from app.schemas.thread import ThreadCreateForm, ThreadUpdateForm
+from app.schemas.thread import ThreadCreateForm, ThreadUpdateForm,SortOption
 
 # Import Services
 from app.services.thread_service import ThreadService
@@ -60,27 +60,51 @@ class ThreadController:
         db: AsyncSession, 
         page: int, 
         limit: int, 
-        category_id: str, 
-        tag: str, 
+        category_id: Optional[str], # Nên để Optional
+        tag: Optional[str],         # Nên để Optional
+        search: Optional[str],      # <--- [MỚI] Nhận search từ Router
+        sort_by: str,               # <--- [MỚI] Nhận sort_by từ Router
         current_user_id: Optional[str] = None
     ):
+        print(f"""
+===== GET POSTS PARAMS =====
+page            = {page}
+limit           = {limit}
+category_id     = {category_id}
+tag             = {tag}
+search          = {search}
+sort_by         = {sort_by}
+current_user_id = {current_user_id}
+============================
+""")
+
+        # Tính toán offset
         skip = (page - 1) * limit
         
         # 1. Gọi Service lấy danh sách
-        result = await self.service.get_threads(
+        result = await self.service.get_threadsHome(
             db=db, 
             skip=skip, 
             limit=limit, 
             category_id=category_id, 
-            tag_name=tag
+            tag_name=tag,
+            search=search,  
+            sort_by= sort_by
         )
-
+       
         threads_list = result.get("data", [])
 
-        # 2. Gắn trạng thái Vote cho cả list
-        await self._append_vote_stats(db, threads_list, current_user_id)
+        # 2. Gắn trạng thái Vote cho cả list (User đã vote bài nào chưa)
+        if threads_list:
+            await self._append_vote_stats(db, threads_list, current_user_id)
 
         return result
+
+    # Hàm phụ trợ _append_vote_stats giữ nguyên...
+    async def _append_vote_stats(self, db, threads, user_id):
+        # Logic check xem user đã vote/like bài nào trong list này chưa
+        # để frontend hiển thị nút like màu xanh/đỏ
+        pass
     
     # --- 6. GET USER THREADS (PROFILE) ---
     async def get_threads_by_user(self, db: AsyncSession, user_id: str, page: int, limit: int, current_user_id: Optional[str] = None):

@@ -49,5 +49,5 @@ async def edit_category( # <--- Thêm async
 async def get_categories(
     db: AsyncSession = Depends(get_async_db) # <--- AsyncSession
 ):
-    # <--- Thêm await
+   
     return await category_controller.get_list(db=db)

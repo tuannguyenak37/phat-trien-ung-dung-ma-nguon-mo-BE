@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession # <--- Dùng AsyncSession
+from fastapi import APIRouter, Depends, status,Query
+from sqlalchemy.ext.asyncio import AsyncSession 
 from typing import Optional
 
 # 1. Đổi import DB Connection
 from app.db.connection import get_async_db 
 from app.controller.thread_controller import ThreadController
-from app.schemas.thread import ThreadCreateForm, ThreadResponse, ThreadUpdateForm, ThreadListResponse
+from app.schemas.thread import ThreadCreateForm, ThreadResponse, ThreadUpdateForm, ThreadListResponse,SortOption
 
 # Import Dependency Auth
 from app.middleware.JWT.auth import get_current_user, get_current_user_or_guest
@@ -16,18 +16,28 @@ router_thead = APIRouter(
 )
 
 # --- GET LIST (FEED) ---
-@router_thead.get("/", response_model=ThreadListResponse)
+@router_thead.get("/list", response_model=ThreadListResponse)
 async def get_list_threads(
-    page: int = 1,
-    limit: int = 10,
+    page: int = Query(1, ge=1, description="Số trang"),
+    limit: int = Query(10, ge=1, le=100, description="Số lượng bài viết mỗi trang"),
     category_id: Optional[str] = None,
     tag: Optional[str] = None,
-    # 👇 QUAN TRỌNG: Đổi thành AsyncSession và get_async_db
+    search: Optional[str] = None,
+    
+    # SortOption Enum
+    sort_by: SortOption = Query(
+        SortOption.MIX, 
+        description="Sắp xếp: 'mix' (đề xuất), 'newest' (mới nhất), 'trending' (hot tuần)"
+    ),
+    
     db: AsyncSession = Depends(get_async_db), 
     current_user: Optional[dict] = Depends(get_current_user_or_guest)
 ):
+    print("dữ liệu home......................",sort_by.value)
+    
     controller = ThreadController()
     
+    # Lấy ID người xem (nếu đã đăng nhập) để check trạng thái Like/Vote
     viewer_id = current_user.get("user_id") if current_user else None
     
     return await controller.get_list_threads(
@@ -36,6 +46,8 @@ async def get_list_threads(
         limit=limit, 
         category_id=category_id, 
         tag=tag,
+        search=search,         # <--- Truyền xuống Controller
+        sort_by=sort_by.value, # <--- Truyền giá trị string ("mix", "newest"...)
         current_user_id=viewer_id
     )
 

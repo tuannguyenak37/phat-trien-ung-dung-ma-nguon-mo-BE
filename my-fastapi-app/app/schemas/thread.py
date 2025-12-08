@@ -3,10 +3,13 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import json
+from enum import Enum
 
-# --- 1. CÁC SCHEMA CON (Dùng để lồng vào ThreadResponse) ---
+class SortOption(str, Enum):
+    MIX = "mix"           # Đề xuất (Mặc định)
+    NEWEST = "newest"     # Mới nhất
+    TRENDING = "trending" # Thịnh hành (Tuần này)
 
-# Để hiển thị thông tin người đăng (Avatar, Tên)
 class UserBasicResponse(BaseModel):
     user_id: str
     firstName: str
