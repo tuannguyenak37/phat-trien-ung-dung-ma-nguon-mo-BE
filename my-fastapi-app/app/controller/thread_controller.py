@@ -149,3 +149,33 @@ class ThreadController:
         await self._append_vote_stats(db, [thread], current_user_id)
         
         return thread
+    async def get_list_search_vector(
+        self, 
+        db: AsyncSession, 
+        page: int, 
+        limit: int, 
+        category_id: Optional[str], 
+        tag: Optional[str], 
+        search: Optional[str], # <--- 1. Thêm tham số search
+        current_user_id: Optional[str] = None
+    ):
+        skip = (page - 1) * limit
+        
+        # 2. Gọi Service và truyền search xuống
+        result = await self.service.get_threads(
+            db=db, 
+            skip=skip, 
+            limit=limit, 
+            category_id=category_id, 
+            tag_name=tag,
+            search=search # <--- Truyền vào đây
+        )
+
+        threads_list = result.get("data", [])
+
+        # 3. Gắn trạng thái Vote cho danh sách kết quả
+        await self._append_vote_stats(db, threads_list, current_user_id)
+
+        return result
+    
+   

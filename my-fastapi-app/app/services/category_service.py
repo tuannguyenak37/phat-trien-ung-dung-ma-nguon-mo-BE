@@ -2,10 +2,10 @@ from sqlalchemy.ext.asyncio import AsyncSession # <--- 1. Dùng AsyncSession
 from sqlalchemy import select # <--- 2. Dùng select
 from slugify import slugify 
 from fastapi import HTTPException, status
-
+from sqlalchemy import func, desc
 from ..models.categories import Categories
 from ..schemas.category import CategoryCreate, categoryEdit # Nhớ import categoryEdit
-
+from app.models.thread import Thread # Import Thread
 class CategoryService:
 
     # --- 1. CREATE ---
@@ -103,3 +103,16 @@ class CategoryService:
              return [] 
              
         return categories
+    
+    @staticmethod
+    async def get_popular(db: AsyncSession, limit: int = 5):
+        # Query: Đếm số thread trong từng category
+        query = (
+            select(Categories)
+            .join(Categories.threads)
+            .group_by(Categories.category_id)
+            .order_by(desc(func.count(Thread.thread_id)))
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        return result.scalars().all()

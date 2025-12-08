@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, delete, func
+from sqlalchemy import select, desc, delete, func,or_,desc
 from sqlalchemy.orm import joinedload
 from fastapi import HTTPException, status
 from typing import List, Optional
@@ -284,3 +284,70 @@ class ThreadService:
         threads = result.unique().scalars().all()
 
         return threads
+    
+   # --- 7. LẤY DANH SÁCH (FULL-TEXT SEARCH VECTOR) ---
+    @staticmethod
+    async def get_threads(
+        db: AsyncSession, 
+        skip: int = 0, 
+        limit: int = 10, 
+        category_id: Optional[str] = None,
+        tag_name: Optional[str] = None,
+        search: Optional[str] = None
+    ):
+        # 1. Base Query: Load các quan hệ để hiển thị
+        query = select(Thread).options(
+            joinedload(Thread.tags),
+            joinedload(Thread.media),
+            joinedload(Thread.user),
+            joinedload(Thread.category)
+        )
+
+        # 2. Join bảng để phục vụ tìm kiếm/lọc
+        # Dùng outerjoin để không bị mất bài viết nếu chưa có tag/category
+        query = query.outerjoin(Thread.category).outerjoin(Thread.tags)
+
+        # 3. Filter Cứng
+        if category_id:
+            query = query.filter(Thread.category_id == category_id)
+        
+        if tag_name:
+            query = query.filter(Tags.name == tag_name)
+
+        # 4. Global Search (ILIKE)
+        if search:
+            search_format = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Thread.title.ilike(search_format),
+                    Thread.content.ilike(search_format),
+                    Categories.name.ilike(search_format),
+                    Tags.name.ilike(search_format)
+                )
+            )
+
+        # 5. Sắp xếp & Phân trang
+        if search:
+            # ✅ Fix lỗi DISTINCT ON: order_by phải có cột distinct ở đầu
+            query = query.distinct(Thread.thread_id).order_by(Thread.thread_id, desc(Thread.created_at))
+        else:
+            # Feed bình thường: chỉ cần order by ngày tạo
+            query = query.order_by(desc(Thread.created_at))
+        
+        # 6. Đếm tổng (Subquery để đảm bảo chính xác với distinct/join)
+        count_query = select(func.count()).select_from(query.subquery())
+        total_res = await db.execute(count_query)
+        total = total_res.scalar() or 0
+
+        # 7. Lấy dữ liệu
+        query = query.offset(skip).limit(limit)
+        
+        result = await db.execute(query)
+        threads = result.unique().scalars().all()
+
+        return {
+            "total": total,
+            "page": (skip // limit) + 1,
+            "size": limit,
+            "data": threads
+        }

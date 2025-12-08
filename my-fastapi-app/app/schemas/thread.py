@@ -71,14 +71,11 @@ class ThreadCreateForm(BaseModel):
             tags=parsed_tags,
             files=files
         )
-
 class ThreadUpdateForm(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     category_id: Optional[str] = None
     tags: Optional[List[str]] = None
-    
-    # 👇 THÊM 2 TRƯỜNG NÀY
     new_files: Optional[List[UploadFile]] = None 
     delete_media_ids: Optional[List[str]] = None
 
@@ -88,44 +85,57 @@ class ThreadUpdateForm(BaseModel):
         title: Optional[str] = Form(None),
         content: Optional[str] = Form(None),
         category_id: Optional[str] = Form(None),
-        tags: Optional[str] = Form(None),
         
-        # 👇 Nhận file mới từ Form Data
+        # 👇 QUAN TRỌNG: Đổi sang List[str] để nhận mảng từ Frontend
+        tags: Optional[List[str]] = Form(None), 
+        
+        # 👇 Nhận mảng file
         new_files: Optional[List[UploadFile]] = File(None),
         
-        # 👇 Nhận danh sách ID cần xóa (Dạng string JSON ["id1", "id2"] hoặc string tách phẩy "id1,id2")
-        delete_media_ids: Optional[str] = Form(None) 
+        # 👇 Nhận mảng ID (Frontend gửi nhiều dòng 'delete_media_ids')
+        delete_media_ids: Optional[List[str]] = Form(None) 
     ):
-        # 1. Xử lý Tags (như cũ)
-        parsed_tags = None
+        # 1. Xử lý Tags
+        # Frontend có thể gửi:
+        # - Nhiều dòng tags: tags=['a', 'b'] -> FastAPI nhận là List -> OK
+        # - Một dòng gộp: tags=['a,b'] -> Cần split
+        parsed_tags = []
         if tags:
-            try:
-                parsed_tags = json.loads(tags)
-            except:
-                parsed_tags = [t.strip() for t in tags.split(",") if t.strip()]
-        
+            for item in tags:
+                # Phòng trường hợp Frontend gửi chuỗi gộp "tag1, tag2" trong 1 phần tử
+                if "," in item:
+                    parsed_tags.extend([t.strip() for t in item.split(",") if t.strip()])
+                else:
+                    parsed_tags.append(item.strip())
+
         # 2. Xử lý Delete Media IDs
-        parsed_delete_ids = None
+        # Tương tự, đảm bảo nhận đúng list
+        parsed_delete_ids = []
         if delete_media_ids:
-            try:
-                # Cố gắng parse JSON: '["media_1", "media_2"]'
-                parsed_delete_ids = json.loads(delete_media_ids)
-                if not isinstance(parsed_delete_ids, list):
-                     parsed_delete_ids = [str(parsed_delete_ids)]
-            except:
-                # Nếu không phải JSON thì tách dấu phẩy: "media_1,media_2"
-                parsed_delete_ids = [m.strip() for m in delete_media_ids.split(",") if m.strip()]
+            # Nếu Frontend gửi JSON string '["id1", "id2"]' (code cũ) -> vẫn support
+            # Nếu Frontend gửi List native ['id1', 'id2'] (code mới) -> nhận luôn
+            for item in delete_media_ids:
+                try:
+                    # Thử parse JSON phòng hờ
+                    loaded = json.loads(item)
+                    if isinstance(loaded, list):
+                        parsed_delete_ids.extend(loaded)
+                    else:
+                        parsed_delete_ids.append(str(loaded))
+                except:
+                    
+                    parsed_delete_ids.append(item)
 
         return cls(
             title=title,
             content=content,
             category_id=category_id,
-            tags=parsed_tags,
-            new_files=new_files,        # <--- Gán vào model
-            delete_media_ids=parsed_delete_ids # <--- Gán vào model
+            tags=parsed_tags if parsed_tags else None,
+            new_files=new_files,
+            delete_media_ids=parsed_delete_ids if parsed_delete_ids else None
         )
 
-# --- 3. RESPONSE SCHEMA (QUAN TRỌNG NHẤT) ---
+# --- 3. RESPONSE SCHEMA 
 
 class ThreadResponse(BaseModel):
     thread_id: str

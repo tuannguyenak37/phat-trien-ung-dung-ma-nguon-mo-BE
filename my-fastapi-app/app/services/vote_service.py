@@ -21,13 +21,22 @@ class VoteService:
         return result.scalar_one_or_none()
 
     # --- HÀM 2: KIỂM TRA TRẠNG THÁI (API Check) ---
-    async def check_user_vote_status(self, user_id: str, thread_id: str = None, comment_id: str = None):
+    # 👇 FIX LỖI Ở ĐÂY: Thêm target_id và target_type
+    async def check_user_vote_status(self, user_id: str, thread_id: str = None, comment_id: str = None, target_id: str = None, target_type: str = None):
         """Trả về 1 (Like), -1 (Dislike) hoặc 0 (Chưa vote)"""
         if not user_id:
             return {"is_voted": 0}
             
+        # Logic Mapping: Nếu truyền target_id (từ CommentController), map nó sang thread_id hoặc comment_id
+        if target_id and target_type:
+            if target_type == "thread":
+                thread_id = target_id
+            elif target_type == "comment":
+                comment_id = target_id
+            
         vote = await self.get_vote(user_id, thread_id, comment_id)
-        # Lưu ý: Đảm bảo Model Vote của bạn dùng cột 'value' hay 'vote_type' cho thống nhất
+        
+        # Dùng thuộc tính 'value' (hoặc 'vote_type' tùy vào model của bạn, code cũ bạn gửi dùng 'value')
         return {"is_voted": vote.value if vote else 0}
 
     # --- HÀM 3: TẠO VOTE & TĂNG COUNTER ---
@@ -41,7 +50,7 @@ class VoteService:
         )
         self.db.add(new_vote)
 
-        # 2. Cập nhật Counter (Thêm await)
+        # 2. Cập nhật Counter
         await self._update_counter(thread_id, comment_id, value, is_increment=True)
 
         await self.db.commit()
@@ -59,9 +68,7 @@ class VoteService:
 
     # --- HÀM 5: ĐẢO NGƯỢC VOTE (Like -> Dislike) ---
     async def update_vote_value(self, vote: Vote, new_value: int):
-        # Logic: 
-        # - Giảm counter của loại cũ (vote.value)
-        # - Tăng counter của loại mới (new_value)
+        # Logic: Giảm cũ, Tăng mới
         await self._update_counter(vote.thread_id, vote.comment_id, vote.value, is_increment=False)
         await self._update_counter(vote.thread_id, vote.comment_id, new_value, is_increment=True)
 
