@@ -3,12 +3,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 # Import async
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from .config import settings  # Import settings từ file bạn vừa sửa
+from .config import settings  
 
-# ============================
-# 1. SETUP CHO SYNC (Code cũ)
-# ============================
-# Dùng trực tiếp DB_URL gốc (postgresql://...)
 engine = create_engine(settings.DB_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
