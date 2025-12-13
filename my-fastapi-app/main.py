@@ -15,7 +15,7 @@ from app.router.admin.dasboard import router as router_dashboard
 origins = [
     "http://localhost:3000",  # URL front-end của bạn
     "http://127.0.0.1:3000",  # Thêm nếu cần
-    # "https://my-frontend.com" # URL deploy production
+    "https://messmer-community.vercel.app",
 ]
 
 app.add_middleware(
