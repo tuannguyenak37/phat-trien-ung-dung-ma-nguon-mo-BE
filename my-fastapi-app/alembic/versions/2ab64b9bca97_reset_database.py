@@ -1,8 +1,8 @@
-"""final_fix
+"""reset_database
 
-Revision ID: f2e3df019eaf
+Revision ID: 2ab64b9bca97
 Revises: 
-Create Date: 2025-11-24 11:15:10.004476
+Create Date: 2025-12-13 15:23:14.130677
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'f2e3df019eaf'
+revision: str = '2ab64b9bca97'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -42,9 +42,13 @@ def upgrade() -> None:
     sa.Column('password', sa.String(length=255), nullable=False),
     sa.Column('firstName', sa.String(length=50), nullable=False),
     sa.Column('lastName', sa.String(length=100), nullable=False),
+    sa.Column('status', sa.Enum('ACTIVE', 'BANNED', name='userstatus'), nullable=False),
     sa.Column('role', sa.Enum('USER', 'ADMIN', 'MODERATOR', name='userrole'), nullable=False),
     sa.Column('reputation_score', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('url_avatar', sa.String(length=255), nullable=True),
+    sa.Column('url_background', sa.String(length=255), nullable=True),
+    sa.Column('description', sa.String(length=500), nullable=True),
     sa.PrimaryKeyConstraint('user_id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -59,11 +63,16 @@ def upgrade() -> None:
     sa.Column('is_pinned', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('comment_count', sa.Integer(), nullable=False),
+    sa.Column('upvote_count', sa.Integer(), nullable=False),
+    sa.Column('downvote_count', sa.Integer(), nullable=False),
     sa.Column('search_vector', postgresql.TSVECTOR(), nullable=True),
+    sa.Column('slug', sa.String(length=100), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['categories.category_id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('thread_id')
     )
+    op.create_index(op.f('ix_threads_slug'), 'threads', ['slug'], unique=True)
     op.create_table('comments',
     sa.Column('comment_id', sa.String(length=50), nullable=False),
     sa.Column('user_id', sa.String(length=50), nullable=True),
@@ -71,6 +80,10 @@ def upgrade() -> None:
     sa.Column('parent_comment_id', sa.String(length=50), nullable=True),
     sa.Column('content', sa.Text(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('reply_count', sa.Integer(), nullable=False),
+    sa.Column('upvote_count', sa.Integer(), nullable=False),
+    sa.Column('downvote_count', sa.Integer(), nullable=False),
     sa.Column('search_vector', postgresql.TSVECTOR(), nullable=True),
     sa.ForeignKeyConstraint(['parent_comment_id'], ['comments.comment_id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['thread_id'], ['threads.thread_id'], ondelete='CASCADE'),
@@ -96,7 +109,7 @@ def upgrade() -> None:
     )
     op.create_table('votes',
     sa.Column('vote_id', sa.String(length=50), nullable=False),
-    sa.Column('user_id', sa.String(length=50), nullable=True),
+    sa.Column('user_id', sa.String(length=50), nullable=False),
     sa.Column('thread_id', sa.String(length=50), nullable=True),
     sa.Column('comment_id', sa.String(length=50), nullable=True),
     sa.Column('value', sa.SmallInteger(), nullable=False),
@@ -105,7 +118,9 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['comment_id'], ['comments.comment_id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['thread_id'], ['threads.thread_id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('vote_id')
+    sa.PrimaryKeyConstraint('vote_id'),
+    sa.UniqueConstraint('user_id', 'comment_id', name='uq_vote_user_comment'),
+    sa.UniqueConstraint('user_id', 'thread_id', name='uq_vote_user_thread')
     )
     # ### end Alembic commands ###
 
@@ -117,6 +132,7 @@ def downgrade() -> None:
     op.drop_table('thread_tags')
     op.drop_table('thread_media')
     op.drop_table('comments')
+    op.drop_index(op.f('ix_threads_slug'), table_name='threads')
     op.drop_table('threads')
     op.drop_index(op.f('ix_users_user_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
