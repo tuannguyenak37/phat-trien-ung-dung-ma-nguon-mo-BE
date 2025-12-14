@@ -4,7 +4,7 @@ from typing import Optional, List
 
 # Import Schemas
 from app.schemas.thread import ThreadCreateForm, ThreadUpdateForm,SortOption
-
+from app.schemas.admin.admin_account_schema import UpdateStatusRequest
 # Import Services
 from app.services.thread_service import ThreadService
 from app.services.vote_service import VoteService 
@@ -202,4 +202,26 @@ current_user_id = {current_user_id}
 
         return result
     
-   
+    async def warn_thread(
+        self, 
+        db: AsyncSession, 
+        thread_id: str, 
+        form_data: UpdateStatusRequest, 
+        current_user: dict
+    ):
+        """
+        Nhận request từ Router, lấy role của user và gọi Service xử lý.
+        """
+        # 1. Lấy role từ thông tin user đăng nhập (đã giải mã từ Token)
+        # Mặc định là 'USER' nếu không tìm thấy key role
+        user_role = current_user.get("role", "USER")
+
+        # 2. Gọi Service
+        result = await ThreadService.warn_and_lock_thread(
+            db=db,
+            thread_id=thread_id,
+            reason=form_data.reason,     # Lý do admin nhập
+            performer_role=user_role     # Role để check quyền
+        )
+        
+        return result

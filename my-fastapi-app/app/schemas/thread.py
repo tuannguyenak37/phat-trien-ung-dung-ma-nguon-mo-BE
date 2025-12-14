@@ -154,9 +154,9 @@ class ThreadResponse(BaseModel):
     comment_count: int = 0
     upvote_count: int = 0
     downvote_count: int = 0
+    is_locked: bool
 
-    # ✅ Quan hệ mở rộng (Nested Objects)
-    # Thay vì chỉ trả về ID, ta trả về cả object để Frontend dễ hiển thị
+   
     user: Optional[UserBasicResponse] = None      # Thông tin người đăng
     category: Optional[CategoryBasicResponse] = None # Thông tin danh mục
     

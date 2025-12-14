@@ -41,7 +41,7 @@ class UserController:
             value=refresh_token,
             httponly=True,
             samesite="None", # Cho phép Cross-site (Vercel gọi Render)
-            secure=False,     # Bắt buộc phải có khi samesite="None" (Render có HTTPS nên ok)
+            secure=True,
             max_age=60*60*24*7
         )
 

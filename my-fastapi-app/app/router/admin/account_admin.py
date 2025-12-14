@@ -8,6 +8,7 @@ import traceback # Import cái này để soi lỗi
 import sys
 from typing import Optional
 from datetime import date
+from app.controller.thread_controller import ThreadController 
 from app.controller.admin.user_management_controller import UserManagementController
 from app.schemas.admin.admin_account_schema import UserListResponse
 # 1. Khởi tạo APIRouter
@@ -57,7 +58,7 @@ async def ban_user_account_endpoint(
 @router.post("/unlock-account", 
              status_code=status.HTTP_200_OK,
              summary="mở  tài khoản người dùng và gửi email thông báo")
-async def ban_user_account_endpoint(
+async def unlock_user_account_endpoint(
     data: UpdateStatusRequest,
     db: AsyncSession = Depends(get_async_db) 
 ):  
@@ -115,3 +116,30 @@ async def get_dashboard_stats(
 ):
     controller = UserManagementController()
     return await controller.get_stats(db=db, start_date=start_date, end_date=end_date)
+
+# ============================================================
+
+@router.post("/threads/{thread_id}/lock", 
+             status_code=status.HTTP_200_OK,
+             summary="Cảnh báo & Khóa bài viết (Gửi email vi phạm)")
+async def warn_and_lock_thread_endpoint(
+    thread_id: str,
+    data: UpdateStatusRequest, 
+    db: AsyncSession = Depends(get_async_db),
+    # Lấy thông tin Admin đang thực hiện hành động này
+    current_user: dict = Depends(require_admin) 
+):
+    try:
+        controller = ThreadController()
+        # Gọi hàm warn_thread trong controller
+        return await controller.warn_thread(db=db, thread_id=thread_id, form_data=data, current_user=current_user)
+        
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        print(f"🔴 Lỗi khi khóa bài viết: {e}")
+        traceback.print_exc(file=sys.stderr)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error while locking thread"
+        )

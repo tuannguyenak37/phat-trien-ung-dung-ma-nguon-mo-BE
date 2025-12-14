@@ -12,6 +12,7 @@ from app.schemas.thread import ThreadCreateForm, ThreadUpdateForm
 from app.middleware.upload.upload_file import upload_service
 from app.utils.reputation_score import update_reputation
 from datetime import datetime, timedelta
+from app.services.admin.email_service import EmailService 
 class ThreadService:
 
     # --- 1. TẠO BÀI VIẾT ---
@@ -215,7 +216,7 @@ class ThreadService:
         result_full = await db.execute(query_full)
         return result_full.unique().scalar_one()
 
-    # --- 6. XÓA BÀI VIẾT ---
+    # --- 6. XÓA BÀI VIẾT (Cập nhật quyền Admin/Mod) ---
     @staticmethod
     async def delete_thread(db: AsyncSession, thread_id: str, user_id: str, role: str):
         query = select(Thread).filter(Thread.thread_id == thread_id)
@@ -223,14 +224,20 @@ class ThreadService:
         thread = result.scalar_one_or_none()
         
         if not thread:
-            raise HTTPException(status_code=404, detail="Thread not found")
+            raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
 
-        if thread.user_id != user_id and role != "admin":
-             raise HTTPException(status_code=403, detail="You are not allowed to delete this thread")
+        # Logic quyền: Chính chủ HOẶC là Admin HOẶC là Moderator
+        allowed_roles = ["admin", "moderator"]
+        
+        # Chuyển role về chữ hoa để so sánh cho chắc chắn
+        user_role_upper = role.upper() if role else ""
+
+        if thread.user_id != user_id and user_role_upper not in allowed_roles:
+             raise HTTPException(status_code=403, detail="Bạn không có quyền xóa bài viết này")
 
         await db.delete(thread)
         await db.commit()
-        return {"message": "Thread deleted successfully"}
+        return {"message": "Đã xóa bài viết thành công"}
     
     # --- LẤY DANH SÁCH (HOME FEED & SEARCH) ---
     @staticmethod
@@ -409,4 +416,45 @@ class ThreadService:
             "page": (skip // limit) + 1,
             "size": limit,
             "data": threads
+        }
+    # --- 9. CẢNH BÁO & KHÓA BÀI ---
+    @staticmethod
+    async def warn_and_lock_thread(
+        db: AsyncSession, 
+        thread_id: str, 
+        reason: str, 
+        performer_role: str
+    ):
+        # 1. Check quyền (như cũ)
+        allowed_roles = ["ADMIN", "MODERATOR"]
+        if performer_role.upper() not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Bạn không có quyền thực hiện hành động này")
+
+        # 2. Tìm bài viết + User (như cũ)
+        query = select(Thread).options(joinedload(Thread.user)).filter(Thread.thread_id == thread_id)
+        result = await db.execute(query)
+        thread = result.scalar_one_or_none()
+
+        if not thread:
+            raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
+
+        # 3. Khóa bài
+        thread.is_locked = True
+        await db.commit()
+
+        # 4. Gửi Email (Cập nhật phần này) 👇
+        if thread.user and thread.user.email:
+            # Lấy tên hiển thị (ưu tiên full_name, nếu ko có thì dùng username)
+            display_name = thread.user.full_name if thread.user.full_name else thread.user.username
+
+            await EmailService.send_post_warning_email(
+                email_to=thread.user.email,
+                full_name=display_name,
+                thread_title=thread.title, # Truyền tiêu đề bài viết
+                reason=reason
+            )
+
+        return {
+            "message": "Đã khóa bài viết và gửi email cảnh báo",
+            "thread_id": thread.thread_id
         }
