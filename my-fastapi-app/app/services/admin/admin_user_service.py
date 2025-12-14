@@ -7,7 +7,6 @@ from sqlalchemy import select, func, cast, Date, and_
 class AdminUserService:
     
     async def get_all_users(self, db: AsyncSession, page: int, limit: int, search: str = None):
-        # 1. Tạo query cơ bản
         query = select(Users)
 
         # 2. Nếu có từ khóa tìm kiếm -> Thêm điều kiện lọc

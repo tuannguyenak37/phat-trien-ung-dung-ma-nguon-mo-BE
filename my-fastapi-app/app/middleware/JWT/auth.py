@@ -11,7 +11,6 @@ from ..config import SECRET_KEY, ALGORITHM
 api_key_header = APIKeyHeader(name="Authorization", auto_error=True)
 
 async def get_current_user(token_header: str = Security(api_key_header)):
-    # Code cũ của bạn (GIỮ NGUYÊN)
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -42,7 +41,7 @@ async def get_current_user(token_header: str = Security(api_key_header)):
 # ==========================================
 # CẤU HÌNH 2: TÙY CHỌN (Dùng cho GET danh sách bài viết)
 # ==========================================
-# 👇 Khác biệt 1: auto_error=False (Không tự động báo lỗi nếu thiếu header)
+
 api_key_header_optional = APIKeyHeader(name="Authorization", auto_error=False)
 
 async def get_current_user_or_guest(

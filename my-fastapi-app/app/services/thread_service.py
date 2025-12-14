@@ -308,9 +308,7 @@ class ThreadService:
             mix_score = post_time + bonus_time
             query = query.order_by(desc(mix_score))
 
-        # 6. COUNT (Tối ưu)
-        # Quan trọng: Phải loại bỏ order_by() trước khi count để query chạy nhanh hơn
-        # và tránh lỗi subquery
+    
         count_query = select(func.count()).select_from(query.order_by(None).subquery())
         total_res = await db.execute(count_query)
         total = total_res.scalar() or 0

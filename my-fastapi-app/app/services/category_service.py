@@ -93,7 +93,7 @@ class CategoryService:
     async def get_all(db: AsyncSession):
         query = select(Categories)
         result = await db.execute(query)
-        return result.scalars().all() # <--- scalars().all() để lấy list
+        return result.scalars().all() 
     
     # --- 5. GET FOR THREAD (Logic giống get_all) ---
     @staticmethod
