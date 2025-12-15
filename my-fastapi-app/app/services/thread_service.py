@@ -417,7 +417,6 @@ class ThreadService:
             "size": limit,
             "data": threads
         }
-    # --- 9. CẢNH BÁO & KHÓA BÀI ---
     @staticmethod
     async def warn_and_lock_thread(
         db: AsyncSession, 
@@ -425,34 +424,47 @@ class ThreadService:
         reason: str, 
         performer_role: str
     ):
-        # 1. Check quyền (như cũ)
+        # 1. Check quyền
         allowed_roles = ["ADMIN", "MODERATOR"]
         if performer_role.upper() not in allowed_roles:
             raise HTTPException(status_code=403, detail="Bạn không có quyền thực hiện hành động này")
 
-        # 2. Tìm bài viết + User (như cũ)
+        # 2. Tìm bài viết + User (Dùng joinedload để lấy luôn thông tin User)
         query = select(Thread).options(joinedload(Thread.user)).filter(Thread.thread_id == thread_id)
         result = await db.execute(query)
         thread = result.scalar_one_or_none()
-
+        
         if not thread:
             raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
 
-        # 3. Khóa bài
-        thread.is_locked = True
-        await db.commit()
-
-        # 4. Gửi Email (Cập nhật phần này) 👇
+        # 3. Khóa bài (Cập nhật trạng thái)
+        # Lưu ý: Kiểm tra model Thread của bạn dùng 'is_locked' (bool) hay 'status' (enum/string)
+        # Nếu model dùng cột status thì sửa dòng dưới thành: thread.status = "LOCKED"
+        thread.is_locked = True 
+        
+        # 4. Gửi Email
         if thread.user and thread.user.email:
-            # Lấy tên hiển thị (ưu tiên full_name, nếu ko có thì dùng username)
-            display_name = thread.user.full_name if thread.user.full_name else thread.user.username
+            # --- SỬA ĐOẠN NÀY ---
+            # Model Users chỉ có firstName, lastName. Không có full_name/username.
+            first_name = thread.user.firstName if thread.user.firstName else ""
+            last_name = thread.user.lastName if thread.user.lastName else ""
+            
+            # Ghép tên hiển thị
+            display_name = f"{first_name} {last_name}".strip()
+            
+            # Nếu tên rỗng thì lấy email làm tên hiển thị
+            if not display_name:
+                display_name = thread.user.email
 
             await EmailService.send_post_warning_email(
                 email_to=thread.user.email,
-                full_name=display_name,
-                thread_title=thread.title, # Truyền tiêu đề bài viết
+                full_name=display_name, # Đã sửa thành biến display_name vừa ghép
+                thread_title=thread.title, 
                 reason=reason
             )
+
+        # 5. Commit sau khi mọi thứ ok
+        await db.commit()
 
         return {
             "message": "Đã khóa bài viết và gửi email cảnh báo",

@@ -8,7 +8,10 @@ class UpdateStatusRequest(BaseModel):
     email:  EmailStr
     status: UserStatus  
     reason: Optional[str] = None  
-
+class UpdateStatusRequestTheadTheads(BaseModel):
+    email:  EmailStr
+    status: bool
+    reason: str
 
 # 1. Dữ liệu của 1 dòng User trong bảng
 class UserAdminItem(BaseModel):

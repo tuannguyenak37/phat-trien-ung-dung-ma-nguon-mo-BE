@@ -132,10 +132,10 @@ class EmailService:
     
     <p>Bài viết của bạn với tiêu đề: <strong style="color: #2d3748;">"{thread_title}"</strong> đã nhận được báo cáo vi phạm từ cộng đồng.</p>
     
-    <p>Sau khi xem xét, Ban quản trị quyết định <strong style="color: #c05621;">TẠM KHÓA</strong> bài viết này với lý do sau:</p>
+    <p>Sau khi xem xét, Ban quản trị quyết định <strong style="color: #c05621;">CẢNH CÁO</strong> bài viết này với lý do sau:</p>
 
     <div style="background-color: #fff; border: 1px dashed #dd6b20; padding: 15px; margin: 15px 0; border-radius: 6px; color: #555;">
-        <em>"{reason}"</em>
+        <em>{reason}</em>
     </div>
 
     <div style="margin-top: 20px; background: #feebc8; padding: 15px; border-radius: 8px; border-left: 4px solid #dd6b20;">

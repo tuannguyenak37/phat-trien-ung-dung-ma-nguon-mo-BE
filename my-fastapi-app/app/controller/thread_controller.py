@@ -209,11 +209,7 @@ current_user_id = {current_user_id}
         form_data: UpdateStatusRequest, 
         current_user: dict
     ):
-        """
-        Nhận request từ Router, lấy role của user và gọi Service xử lý.
-        """
-        # 1. Lấy role từ thông tin user đăng nhập (đã giải mã từ Token)
-        # Mặc định là 'USER' nếu không tìm thấy key role
+       
         user_role = current_user.get("role", "USER")
 
         # 2. Gọi Service

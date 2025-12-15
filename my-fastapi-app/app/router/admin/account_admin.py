@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, status,HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession 
 from app.db.connection import get_async_db
-from app.schemas.admin.admin_account_schema import UpdateStatusRequest,DashboardStatsResponse
+from app.schemas.admin.admin_account_schema import UpdateStatusRequest,DashboardStatsResponse,UpdateStatusRequestTheadTheads
 from app.controller.admin.email_controller import email_controler 
 from app.middleware.JWT.authAdmin import require_admin
 import traceback # Import cái này để soi lỗi
@@ -124,7 +124,7 @@ async def get_dashboard_stats(
              summary="Cảnh báo & Khóa bài viết (Gửi email vi phạm)")
 async def warn_and_lock_thread_endpoint(
     thread_id: str,
-    data: UpdateStatusRequest, 
+    data: UpdateStatusRequestTheadTheads, 
     db: AsyncSession = Depends(get_async_db),
     # Lấy thông tin Admin đang thực hiện hành động này
     current_user: dict = Depends(require_admin) 
